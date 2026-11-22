@@ -54,3 +54,18 @@ label { display: block; margin: 0.75rem 0; font-weight: 600; } label > * { margi
 .vacio { text-align: center; padding: 1.5rem 0; }
 .lista li.edicion { display: block; }
 .respuesta:focus { outline: none; }
+
+/* Tareas, metas y apuntes */
+.atrasadas { border: 1px solid var(--peligro); border-left-width: 6px; border-radius: 8px; padding: 0.5rem 1rem; margin: 1rem 0; background: var(--aviso-fondo); color: var(--aviso-texto); }
+.atrasadas h2 { margin-top: 0.25rem; color: var(--peligro); }
+.acceso-fijo { position: sticky; bottom: 0.5rem; margin: 1rem 0; z-index: 1; }
+.tilde { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; cursor: pointer; }
+.tilde input[type="checkbox"] { width: 1.4rem; height: 1.4rem; }
+.hecha .texto { text-decoration: line-through; color: var(--suave); }
+.nota { margin: 0.25rem 0 0 2rem; }
+.progreso { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
+.meta-descartada strong, .meta-lograda strong { color: var(--suave); }
+.filtros { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.5rem 0 1rem; }
+.captura, .edicion { display: grid; gap: 0.5rem; }
+.markdown p, .markdown ul, .markdown ol { margin: 0.25rem 0; }
+.markdown a { color: var(--acento); }

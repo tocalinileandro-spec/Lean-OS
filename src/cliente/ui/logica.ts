@@ -6,10 +6,11 @@ import type { Almacen } from "../../compartido/almacen.ts";
 import { fijarHoraCambio, diaLogico } from "../../compartido/dia.ts";
 import {
   CALIFICACIONES, HORA_CAMBIO_DE_DIA, NUEVAS_POR_DIA,
-  type Area, type Calificacion, type FechaISO, type Id, type Tarjeta,
+  type Area, type Calificacion, type FechaISO, type Id, type Tarea, type Tarjeta,
 } from "../../compartido/esquema.ts";
 import { calcularEstadisticas, type Estadisticas } from "../../compartido/estadisticas.ts";
 import { normalizar } from "../../compartido/normalizar.ts";
+import { tareasDeHoy } from "../../compartido/tareas.ts";
 import { calificar, construirCola, SesionRepaso } from "../../compartido/repaso.ts";
 import type { Reloj } from "../../compartido/reloj.ts";
 
@@ -42,7 +43,8 @@ export function textoIntervalo(dias: number): string {
 /** Nunca se muestra un error técnico crudo: mensaje en castellano que dice qué hacer. */
 export function mensajeDeError(error: unknown): string {
   const t = error instanceof Error ? error.message : "";
-  if (/no puede quedar vacía/.test(t)) return t.replace(/^Error:\s*/, "") + ". Completalo y volvé a guardar.";
+  if (/no puede (quedar|estar) (vacía|vacío)/.test(t)) return t.replace(/^Error:\s*/, "") + ". Completalo y volvé a guardar.";
+  if (/^(Fecha inválida|El año no es válido)/.test(t)) return "La fecha o el año no son válidos. Revisalos y volvé a guardar.";
   return "No se pudo completar la acción. Probá de nuevo; si sigue fallando, recargá la página (tus datos están guardados).";
 }
 
@@ -95,11 +97,18 @@ export interface VistaHoy {
   fecha: string;
   pendientes: number;
   estadisticas: Estadisticas;
+  /** Pendientes con fecha anterior a hoy (se muestran destacadas arriba). */
+  atrasadas: Tarea[];
+  /** Tareas con fecha de hoy (pendientes y hechas). */
+  tareas: Tarea[];
 }
 
 export async function vistaHoy(d: Dependencias): Promise<VistaHoy> {
   const aj = cargarAjustes(d.persistencia);
+  const t = await tareasDeHoy(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia });
   return {
+    atrasadas: t.atrasadas,
+    tareas: t.hoy,
     fecha: formatearFecha(diaLogico(d.reloj)),
     pendientes: (await construirCola(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia })).length,
     estadisticas: await calcularEstadisticas(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia }),
