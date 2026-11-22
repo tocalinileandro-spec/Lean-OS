@@ -71,3 +71,9 @@ Formato: fecha, qué se eligió, por qué.
 - **Fuera de esta tarea (fase 4):** exportar/importar respaldo, estado de sync, cerrar sesión, PWA. Tareas y Apuntes (fase 3): la navegación solo tiene Hoy, Repaso, Tarjetas y Ajustes.
 - **IDS_EXIGIBLES** ampliado con R9. Se agregaron pruebas sin ID de recorrido completo (importar, repasar con teclado y Ctrl+Z, recarga con el mismo IDBFactory), ajustes y gestión.
 - **CI:** `ci/ci.yml` corre `npm run build` antes de `npm run verificar`.
+
+## 2026-11-22 (reglas nuevas del dueño para esta etapa)
+
+- **Reglas que reemplazan a las anteriores** (instrucción expresa del dueño, 2026-11-22): (1) los agentes pueden escribir `.github/workflows`; `ci/ci.yml` se movió a `.github/workflows/ci.yml` (si GitHub rechaza un push de workflow: BLOQUEOS.md y el archivo queda en `ci/`). (2) El Director abre y fusiona los pull requests con CI verde y revisor aprobado; se elimina el requisito de CODEOWNERS, protección de rama y OK del dueño. (3) Tope de 10 tareas por sesión reemplazado por presupuesto de 20 horas acumuladas entre sesiones; se mantiene el tope de 3 ciclos programador-revisor por tarea. (4) Guardia de sesión en ESTADO.md: otra sesión activa con menos de 3 h o la palabra COMPLETO = terminar sin hacer nada.
+- **Cambios en documentos:** CLAUDE.md, secciones 1, 7 y 9 de docs/VISION.md y `.claude/agents/programador.md`. En la sección 1 se agregó la excepción expresa para respaldo externo y audio (vienen desactivados; solo funcionan si el dueño los activa en Ajustes y carga su clave; la app funciona completa sin ellos) y se sacaron del "fuera de alcance" audio, recurrentes y gráficos, que pasan a opcionales con criterios O* propios.
+- **Alcance de esta etapa:** fases 3, 4 y 5 más los opcionales (gráficos, recurrentes, respaldo externo, audio). El PR #1 (fases 1 y 2) ya estaba fusionado en `main` al empezar.

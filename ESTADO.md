@@ -1,5 +1,12 @@
 # Estado
 
+## Control de sesión (presupuesto de 20 h)
+
+- **Sesión activa:** desde 2026-11-22 21:54:43 UTC (marca de actividad: 2026-11-22 21:54:43 UTC). Si otra sesión ve esto con menos de 3 h de antigüedad, no hace nada.
+- **Horas acumuladas de sesiones anteriores:** 0 h. Total consumido al cerrar cada sesión = anterior + (hora de cierre − hora de inicio).
+- **Estado de `main`:** fases 1 y 2 fusionadas (PR #1).
+- **Próximo paso exacto:** reglas nuevas (PR `tarea/meta-reglas`), luego fase 3.
+
 - **Fase actual:** fases 1 y 2 CERRADAS (2026-11-22). Próxima: fase 3 (Tareas y apuntes).
 - **Cierre de fase 2:** `npm run verificar` APROBADO con B1, I1-I7, R1-R9 y S1 en verde; revisión aprobada en cada tarea (F2-b y F2-c en el ciclo 2, F2-d en el ciclo 3; ningún tope superado). Todo vive en la rama `claude/focused-galileo-c897zy`, sin fusionar a `main` (falta abrir el pull request).
 - **Hecho:** prototipo movido a `prototipo/`; package.json, tsconfig estricto, vitest; esquema de datos (tipos); reloj real y simulado; `npm run verificar` con REPORTE.md; CI escrito en `ci/ci.yml`; DECISIONES.md y BLOQUEOS.md.
