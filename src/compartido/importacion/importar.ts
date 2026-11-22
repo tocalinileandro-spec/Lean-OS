@@ -25,7 +25,7 @@ export interface OpcionesImportar {
 const nuevoId = (): Id => crypto.randomUUID();
 
 /** Busca el área (por nombre normalizado y padre) o la crea con la primera escritura. */
-async function resolverArea(almacen: Almacen, nombre: string, padre: Id | null, ahora: string): Promise<Area> {
+export async function resolverArea(almacen: Almacen, nombre: string, padre: Id | null, ahora: string): Promise<Area> {
   const norm = normalizar(nombre);
   const existentes = await almacen.areas.listar();
   const hallada = existentes.find((a) => a.nombre_normalizado === norm && a.padre_id === padre);

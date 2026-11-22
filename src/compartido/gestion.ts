@@ -4,13 +4,51 @@
  * `contenido_updated_at`; el estado de repaso no se toca acá.
  */
 import type { Almacen } from "./almacen.ts";
-import { DIAS_PAPELERA, type Apunte, type Id, type Meta, type Tarea, type Tarjeta } from "./esquema.ts";
+import { diaLogico } from "./dia.ts";
+import { DIAS_PAPELERA, EASE_INICIAL, type Apunte, type Id, type Meta, type Tarea, type Tarjeta } from "./esquema.ts";
+import { resolverArea } from "./importacion/importar.ts";
+import { partirArea } from "./normalizar.ts";
 import type { Reloj } from "./reloj.ts";
 
 export interface CambiosTarjeta {
   pregunta?: string;
   respuesta?: string;
   pista?: string | null;
+}
+
+export interface DatosTarjeta {
+  pregunta: string;
+  respuesta: string;
+  pista?: string | null;
+  /** Área existente... */
+  area_id?: Id | null;
+  /** ...o texto "Área > Subárea" (si viene, tiene prioridad; se une con el área existente). */
+  area_texto?: string | null;
+}
+
+/** Crea una tarjeta a mano (por ejemplo, convertida desde un apunte). Nueva: ease 2,5, vence hoy. */
+export async function crearTarjeta(almacen: Almacen, reloj: Reloj, datos: DatosTarjeta): Promise<Tarjeta> {
+  if (!datos.pregunta.trim()) throw new Error("La pregunta no puede quedar vacía");
+  if (!datos.respuesta.trim()) throw new Error("La respuesta no puede quedar vacía");
+  const ahora = reloj.ahora().toISOString();
+  let areaId: Id | null = datos.area_id ?? null;
+  if (datos.area_texto?.trim()) {
+    const escrita = partirArea(datos.area_texto);
+    if (typeof escrita === "string") throw new Error("El área no puede quedar vacía: escribila como Área o Área > Subárea");
+    const raiz = await resolverArea(almacen, escrita.area, null, ahora);
+    areaId = (escrita.subarea ? await resolverArea(almacen, escrita.subarea, raiz.id, ahora) : raiz).id;
+  }
+  if (!areaId) throw new Error("El área no puede quedar vacía: elegí una o escribí una nueva");
+  const area = await almacen.areas.obtener(areaId);
+  if (!area || area.deleted_at !== null) throw new Error(`Área inexistente: ${areaId}`);
+  const t: Tarjeta = {
+    id: crypto.randomUUID(), created_at: ahora, updated_at: ahora, deleted_at: null, rev: null,
+    area_id: areaId, pregunta: datos.pregunta, respuesta: datos.respuesta, pista: datos.pista?.trim() ? datos.pista.trim() : null,
+    suspendida: false, importacion_id: null, ease: EASE_INICIAL, intervalo: 0, reps: 0, lapses: 0, vence: diaLogico(reloj),
+    contenido_updated_at: ahora, repaso_updated_at: ahora,
+  };
+  await almacen.tarjetas.guardar(t);
+  return t;
 }
 
 async function tarjetaViva(almacen: Almacen, id: Id): Promise<Tarjeta> {
