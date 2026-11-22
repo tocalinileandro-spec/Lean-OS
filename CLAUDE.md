@@ -20,7 +20,7 @@ Lean OS es la app personal de estudio y organización de Leandro: tarjetas con r
 ## Reglas fijas
 
 - **Lenguaje:** todo en TypeScript, cliente y servidor.
-- **Prototipo:** los archivos en Python de la raíz (`servidor.py`, `LeanOS.spec`, los `.bat`, etc.) son el prototipo viejo. En la fase 1 se mueven a `prototipo/` sin modificarlos y se usan solo como referencia de comportamiento.
+- **Prototipo:** todo lo que hoy está en el repo, salvo CLAUDE.md, docs/ y .claude/ (las carpetas motor, pruebas, web y ejemplos, servidor.py, los .bat, los requirements y las guías), es el prototipo viejo en Python. En la fase 1 se mueve entero a prototipo/ sin modificarlo y se usa solo como referencia de comportamiento..
 - **Secretos:** nunca en el repo, en registros ni en commits. Usá `.env.example` con los nombres vacíos. El agente no tiene permiso Workflows: los archivos de CI se escriben en `ci/` y el dueño los copia a `.github/workflows`.
 - **Memoria entre sesiones:** cada sesión arranca sin recuerdos, así que todo lo importante va a archivos. `ESTADO.md` se actualiza al cerrar cada tarea y cada fase; las decisiones van a `DECISIONES.md` (fecha, qué se eligió, por qué); los bloqueos a `BLOQUEOS.md`.
 - **Idioma:** la interfaz va en español rioplatense. Los commits y los archivos de estado, en español.
