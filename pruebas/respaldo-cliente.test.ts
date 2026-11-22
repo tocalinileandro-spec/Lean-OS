@@ -12,7 +12,7 @@ import { crearApunte } from "../src/compartido/apuntes.ts";
 import { calificarYGuardar, deshacerCalificacion } from "../src/compartido/repaso.ts";
 import { crearMetaAnual, crearTarea, editarTarea, marcarHecha } from "../src/compartido/tareas.ts";
 import { VERSION_FORMATO } from "../src/compartido/respaldo-formato.ts";
-import { contarTodo } from "../src/servidor/respaldo.ts";
+import { contarTodo, restaurarRespaldo } from "../src/servidor/respaldo.ts";
 import { cargarTarjetas, Entorno, entrar, MemoriaPersistente } from "./ayuda-sync.ts";
 
 async function conteos(a: Almacen) {
@@ -104,6 +104,32 @@ describe("exportar e importar en el cliente", () => {
     const sinRevDeRepasos = (t: string, xs: any[]) => (t === "repasos" ? xs.map(({ rev, ...r }) => r) : xs);
     for (const t of TABLAS) expect(sinRevDeRepasos(t, porId(local.tablas[t] as any[]))).toEqual(sinRevDeRepasos(t, porId(delServidor.tablas[t])));
     expect(local.rev).toBe(delServidor.rev);
+  });
+
+  it("el export de un cliente (repasos propios, registros sin rev) se restaura en un servidor vacío con los mismos conteos y llega a los demás clientes", async () => {
+    const e = await Entorno.crear();
+    const origen = new AlmacenMemoria();
+    await cargarTarjetas(origen, e.reloj, 3);
+    const ts = await origen.tarjetas.listar();
+    e.reloj.avanzarMinutos(1);
+    await calificarYGuardar(origen, e.reloj, ts[0]!.id, "bien");
+    await calificarYGuardar(origen, e.reloj, ts[1]!.id, "facil");
+    await crearTarea(origen, e.reloj, { titulo: "sin rev" });
+    const texto = await exportarLocalTexto(origen, e.reloj);
+    expect(JSON.parse(texto).tablas.repasos[0].rev).toBeNull();
+    const vacio = await Entorno.crear();
+    const cont = restaurarRespaldo(vacio.servidor.db, JSON.parse(texto));
+    expect(cont).toMatchObject({ tarjetas: 3, repasos: 2, tareas: 1 });
+    expect(cont).toEqual(await conteos(origen));
+    // Los revs asignados son enteros mayores que 0: un pull desde 0 los trae.
+    const otro = vacio.cliente();
+    await entrar(otro);
+    expect(await conteos(otro.crudo)).toEqual(await conteos(origen));
+    expect(() => restaurarRespaldo((vacio as any).servidor.db, JSON.parse(texto))).toThrow(/ya tiene datos/);
+    const roto = JSON.parse(texto);
+    roto.tablas.tareas[0].rev = "x";
+    const otroVacio = await Entorno.crear();
+    expect(() => restaurarRespaldo(otroVacio.servidor.db, roto)).toThrow(/rev válido/);
   });
 
   it("importa también el export del servidor (con revs) en una instalación limpia", async () => {

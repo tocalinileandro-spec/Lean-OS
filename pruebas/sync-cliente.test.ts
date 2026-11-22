@@ -503,3 +503,46 @@ describe("cola y almacén sincronizado", () => {
     idb.cerrar();
   });
 });
+
+describe("carreras y cierre de sesión", () => {
+  it("una edición local hecha en medio de aplicar el pull no se pierde", async () => {
+    const e = await Entorno.crear();
+    const a = e.cliente();
+    const b = e.cliente();
+    await entrar(a);
+    await entrar(b);
+    const t = await crearTarea(a.almacen, e.reloj, { titulo: "Original" });
+    await a.motor.sincronizar();
+    await b.motor.sincronizar();
+    minutos(e, 1);
+    await editarTarea(b.almacen, e.reloj, t.id, { titulo: "Edición de B" });
+    await b.motor.sincronizar();
+    minutos(e, 1);
+    // A edita mientras el motor está justo escribiendo lo que bajó del servidor.
+    let edicion: Promise<unknown> | undefined;
+    const original = a.crudo.guardarLote.bind(a.crudo);
+    a.crudo.guardarLote = async (lote) => {
+      edicion = editarTarea(a.almacen, e.reloj, t.id, { titulo: "Edición local en medio" });
+      await new Promise((r) => setTimeout(r, 5));
+      await original(lote);
+    };
+    await a.motor.sincronizar();
+    await edicion;
+    expect((await a.crudo.tareas.obtener(t.id))?.titulo).toBe("Edición local en medio");
+    await a.motor.sincronizar();
+    expect(fila(e.servidor.db, "tareas", t.id)?.["titulo"]).toBe("Edición local en medio");
+  });
+
+  it("cerrar sesión con una sincronización en vuelo termina en 'Solo local', no en 'Sesión vencida'", async () => {
+    const e = await Entorno.crear();
+    const c = e.cliente();
+    await entrar(c);
+    await cargarTarjetas(c.almacen, e.reloj, 2);
+    const sync = c.motor.sincronizar();
+    await c.motor.cerrarSesion();
+    await sync;
+    await c.motor.esperar();
+    expect(c.motor.estado().fase).toBe("solo_local");
+    expect((await c.crudo.tarjetas.listar()).length).toBe(2);
+  });
+});

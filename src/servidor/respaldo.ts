@@ -34,9 +34,18 @@ export interface OpcionesRestauracion {
 
 /** Restaura un export a un servidor vacío (conserva ids y revs). Todo o nada. */
 export function restaurarRespaldo(db: DatabaseSync, datos: unknown, opciones: OpcionesRestauracion = {}): Record<Tabla, number> {
-  const v = validarExportacion(datos, true);
+  // El rev puede faltar (export del cliente: registros nunca sincronizados y repasos locales): se asigna uno nuevo.
+  const v = validarExportacion(datos, false);
   if ("error" in v) throw new ErrorRestauracion(v.error);
   const d = v.exportacion;
+  for (const t of TABLAS) {
+    d.tablas[t].forEach((r, i) => {
+      const rev = r["rev"];
+      if (rev != null && !(Number.isInteger(rev) && (rev as number) >= 0)) {
+        throw new ErrorRestauracion(`El registro ${i + 1} de ${t} es inválido: falta rev válido.`);
+      }
+    });
+  }
   const hayDatos = TABLAS.some((t) => contarFilas(db, t) > 0);
   if (hayDatos && !opciones.reemplazarDatos) {
     throw new ErrorRestauracion("El servidor ya tiene datos: no se restaura encima. Restaurá en un servidor vacío o pedí el reemplazo explícito.");
@@ -44,11 +53,12 @@ export function restaurarRespaldo(db: DatabaseSync, datos: unknown, opciones: Op
   db.exec("BEGIN");
   try {
     let maxRev = typeof d.rev === "number" ? d.rev : 0;
+    for (const t of TABLAS) for (const r of d.tablas[t]) if (typeof r["rev"] === "number") maxRev = Math.max(maxRev, r["rev"]);
     for (const t of TABLAS) {
       db.exec(`DELETE FROM ${t}`);
       for (const r of d.tablas[t]) {
-        guardarFila(db, t, r);
-        maxRev = Math.max(maxRev, r["rev"] as number);
+        // Sin rev: uno nuevo, mayor que el máximo del archivo (con 0 un pull desde 0 no lo traería).
+        guardarFila(db, t, typeof r["rev"] === "number" ? r : { ...r, rev: ++maxRev });
       }
     }
     fijarRev(db, maxRev);

@@ -46,7 +46,19 @@ export class ColaMemoria implements ColaCambios {
   }
 }
 
+/** Exclusión mutua asíncrona: el motor aplica lo del servidor (leer, fusionar, escribir) sin que se cuele una edición local en el medio. */
+export class Candado {
+  #cola: Promise<void> = Promise.resolve();
+  ejecutar<T>(f: () => Promise<T>): Promise<T> {
+    const r = this.#cola.then(f, f);
+    this.#cola = r.then(() => undefined, () => undefined);
+    return r;
+  }
+}
+
 export interface OpcionesSincronizado {
+  /** Se comparte con el motor: las escrituras locales esperan a que termine de aplicar una página del servidor. */
+  candado?: Candado;
   /** Se llama después de cada guardado (para que el motor programe una sincronización). */
   alCambiar?: () => void;
   /** Se llama si no se pudo anotar en la cola: el guardado igual se hizo, así que conviene una subida completa. */
@@ -61,7 +73,7 @@ type Anotador = (cambios: CambioPendiente[]) => Promise<void>;
  * impide ni deshace el guardado.
  */
 class RepoSincronizado<T extends Registro> implements Repositorio<T> {
-  constructor(private interno: Repositorio<T>, private tabla: Tabla, private anotar: Anotador, private avisar: () => void) {}
+  constructor(private interno: Repositorio<T>, private tabla: Tabla, private anotar: Anotador, private avisar: () => void, private bloq: <R>(f: () => Promise<R>) => Promise<R>) {}
   obtener(id: Id) {
     return this.interno.obtener(id);
   }
@@ -74,7 +86,7 @@ class RepoSincronizado<T extends Registro> implements Repositorio<T> {
   async guardarVarios(items: T[]) {
     const cambios = items.map((x) => ({ tabla: this.tabla, id: x.id }));
     await this.anotar(cambios);
-    await this.interno.guardarVarios(items);
+    await this.bloq(() => this.interno.guardarVarios(items));
     await this.anotar(cambios);
     this.avisar();
   }
@@ -85,11 +97,11 @@ class RepoSincronizado<T extends Registro> implements Repositorio<T> {
 }
 
 class RepasosSincronizado implements RepositorioRepasos {
-  constructor(private interno: RepositorioRepasos, private anotar: Anotador, private avisar: () => void) {}
+  constructor(private interno: RepositorioRepasos, private anotar: Anotador, private avisar: () => void, private bloq: <R>(f: () => Promise<R>) => Promise<R>) {}
   async agregar(r: Repaso) {
     const cambios = [{ tabla: "repasos" as const, id: r.id }];
     await this.anotar(cambios);
-    await this.interno.agregar(r);
+    await this.bloq(() => this.interno.agregar(r));
     await this.anotar(cambios);
     this.avisar();
   }
@@ -113,6 +125,8 @@ export class AlmacenSincronizado implements Almacen {
   fallosDeCola = 0;
 
   constructor(private interno: Almacen, cola: ColaCambios, private opciones: OpcionesSincronizado = {}) {
+    const candado = this.opciones.candado ?? new Candado();
+    const bloq = <T>(f: () => Promise<T>) => candado.ejecutar(f);
     const anotar: Anotador = async (cambios) => {
       try {
         await cola.anotar(cambios);
@@ -126,18 +140,20 @@ export class AlmacenSincronizado implements Almacen {
       }
     };
     const avisar = () => this.#cambio();
-    const envolver = <T extends Registro>(r: Repositorio<T>, tabla: Tabla) => new RepoSincronizado<T>(r, tabla, anotar, avisar);
+    const envolver = <T extends Registro>(r: Repositorio<T>, tabla: Tabla) => new RepoSincronizado<T>(r, tabla, anotar, avisar, bloq);
     this.tarjetas = envolver(interno.tarjetas, "tarjetas");
     this.areas = envolver(interno.areas, "areas");
     this.apuntes = envolver(interno.apuntes, "apuntes");
     this.importaciones = envolver(interno.importaciones, "importaciones");
     this.metas = envolver(interno.metas, "metas");
     this.tareas = envolver(interno.tareas, "tareas");
-    this.repasos = new RepasosSincronizado(interno.repasos, anotar, avisar);
+    this.repasos = new RepasosSincronizado(interno.repasos, anotar, avisar, bloq);
     this.#anotar = anotar;
+    this.#bloq = bloq;
   }
 
   #anotar: Anotador;
+  #bloq: <R>(f: () => Promise<R>) => Promise<R>;
 
   #cambio(): void {
     try {
@@ -155,7 +171,7 @@ export class AlmacenSincronizado implements Almacen {
     ];
     for (const [tabla, items] of partes) for (const x of items ?? []) cambios.push({ tabla, id: x.id });
     await this.#anotar(cambios);
-    await this.interno.guardarLote(lote);
+    await this.#bloq(() => this.interno.guardarLote(lote));
     await this.#anotar(cambios);
     this.#cambio();
   }

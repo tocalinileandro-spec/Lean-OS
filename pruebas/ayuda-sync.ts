@@ -4,7 +4,7 @@ import { AlmacenMemoria } from "../src/compartido/almacen.ts";
 import type { Almacen } from "../src/compartido/almacen.ts";
 import { importar } from "../src/compartido/importacion/importar.ts";
 import { RelojSimulado } from "../src/compartido/reloj.ts";
-import { AlmacenSincronizado, ColaMemoria } from "../src/cliente/sync/cola.ts";
+import { AlmacenSincronizado, Candado, ColaMemoria } from "../src/cliente/sync/cola.ts";
 import type { ColaCambios } from "../src/cliente/sync/cola.ts";
 import { MotorSync } from "../src/cliente/sync/motor.ts";
 import type { OpcionesMotor, Programador } from "../src/cliente/sync/motor.ts";
@@ -99,12 +99,14 @@ export class Entorno {
     const persistencia = (opciones.persistencia as MemoriaPersistente | undefined) ?? new MemoriaPersistente();
     const programador = new ProgramadorFalso();
     let motor: MotorSync | undefined;
+    const candado = new Candado();
     const almacen = new AlmacenSincronizado(crudo, cola, {
+      candado,
       alCambiar: () => motor?.cambioLocal(),
       alFallarCola: () => motor?.pedirSubidaCompleta(),
     });
     motor = new MotorSync({
-      almacen: crudo, cola, fetch: this.fetch, reloj: this.reloj, persistencia, programador, ...opciones,
+      almacen: crudo, cola, fetch: this.fetch, reloj: this.reloj, persistencia, programador, candado, ...opciones,
     });
     return { motor, almacen, crudo, cola, persistencia, programador };
   }

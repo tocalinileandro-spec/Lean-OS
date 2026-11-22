@@ -13,7 +13,7 @@ import { TABLAS } from "../../compartido/esquema.ts";
 import type { Id, Registro, Repaso, Tabla } from "../../compartido/esquema.ts";
 import type { Reloj } from "../../compartido/reloj.ts";
 import type { Fila } from "../../compartido/respaldo-formato.ts";
-import { contarPendientes } from "./cola.ts";
+import { Candado, contarPendientes } from "./cola.ts";
 import type { CambioPendiente, ColaCambios, EntradaCola } from "./cola.ts";
 import type { ConfirmacionPendiente, EstadoSync, FaseSync } from "./estado.ts";
 import { fusionar } from "./fusion.ts";
@@ -61,6 +61,8 @@ export interface OpcionesMotor {
   programador?: Programador;
   /** Para escuchar `online` (window). */
   eventos?: { addEventListener(tipo: "online", f: () => void): void };
+  /** El mismo que usa el AlmacenSincronizado de la app (si no se pasa, no hay exclusión con las ediciones). */
+  candado?: Candado;
   tamanoLote?: number;
   limitePagina?: number;
   /** Espera tras un cambio local antes de sincronizar (agrupa ráfagas). */
@@ -109,6 +111,7 @@ export class MotorSync implements ControlSync {
   #timerPeriodico: unknown = null;
   #timerCambio: unknown = null;
   #detenido = false;
+  #sesionCerrada = false;
   #oyentes = new Set<(e: EstadoSync) => void>();
 
   constructor(opciones: OpcionesMotor) {
@@ -229,6 +232,7 @@ export class MotorSync implements ControlSync {
     }
     if (typeof token !== "string" || token === "") return { ok: false, mensaje: "No se pudo iniciar sesión. Probá de nuevo en un rato." };
     this.#escribir(CLAVE_TOKEN, token);
+    this.#sesionCerrada = false;
     this.#fase = "sincronizado";
     this.#error = null;
     this.#fallos = 0;
@@ -241,6 +245,7 @@ export class MotorSync implements ControlSync {
   /** Cierra la sesión en el servidor (si se puede) y borra el token. Los datos locales no se tocan. */
   async cerrarSesion(): Promise<void> {
     const token = this.#token();
+    this.#sesionCerrada = true;
     this.#escribir(CLAVE_TOKEN, null);
     this.#fase = "solo_local";
     this.#error = null;
@@ -371,7 +376,10 @@ export class MotorSync implements ControlSync {
       this.#guardarEstado(e);
     } catch (err) {
       const t = err instanceof ErrorSync ? err : new ErrorSync("servidor");
-      if (t.tipo === "sesion") {
+      if (t.tipo === "sesion" && this.#sesionCerrada) {
+        // La sesión se cerró a propósito mientras sincronizaba: no es una sesión vencida.
+        this.#fase = "solo_local";
+      } else if (t.tipo === "sesion") {
         // Sesión vencida: se borra el token (ya no sirve) y no se toca ningún dato.
         this.#escribir(CLAVE_TOKEN, null);
         this.#fase = "sesion_vencida";
@@ -537,6 +545,11 @@ export class MotorSync implements ControlSync {
 
   /** Aplica una página del servidor al almacén local SIN anotarla en la cola. Nunca borra. */
   async #aplicar(r: Record<Tabla, Fila[]>): Promise<void> {
+    await (this.#o.candado ?? new Candado()).ejecutar(() => this.#aplicarBajoCandado(r));
+  }
+
+  /** Leer, fusionar y escribir en un solo paso exclusivo: ninguna edición local se cuela entre la lectura y la escritura. */
+  async #aplicarBajoCandado(r: Record<Tabla, Fila[]>): Promise<void> {
     const lote: Record<string, Fila[]> = {};
     const aSubir: CambioPendiente[] = [];
     for (const tabla of TABLAS) {
