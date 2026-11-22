@@ -132,7 +132,7 @@ Ante cualquier duda, la app elige lo que no pierde datos y no pregunta; la únic
 
 Una función está terminada solo cuando su prueba pasa sola, sin intervención humana. Un único comando (`npm run verificar`) corre todas las pruebas con reloj simulado y datos de ejemplo, y escribe REPORTE.md con el resultado de cada ID. Para poder simular el tiempo, el código recibe el reloj como dependencia.
 
-Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio, tareas recurrentes y gráficos; cada grupo se agrega antes de construirlo).
+Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio O7-O12, tareas recurrentes y gráficos; cada grupo se agrega antes de construirlo).
 
 | ID | Qué hace la prueba | Resultado esperado |
 | --- | --- | --- |
@@ -177,6 +177,12 @@ Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G se
 | O4 | Respaldo externo activado pero sin claves, o el destino falla o no responde | El respaldo local se hace igual, la app y la sincronización siguen normales, y Ajustes muestra “falta configurar” o el último error en castellano |
 | O5 | Subir respaldos externos durante más de 30 días simulados | En el destino solo quedan los últimos 30 |
 | O6 | Activar y desactivar el respaldo externo desde Ajustes; revisar los registros del servidor y la salida de una corrida | El estado se guarda en el servidor, exige sesión (401 sin ella) y ningún registro contiene claves ni contenido |
+| O7 | Entrada por audio desactivada (valor por defecto): abrir la captura rápida y pedir la transcripción al servidor | No hay botón de micrófono, el servidor responde 403 y no se hace ninguna llamada de red a terceros |
+| O8 | Audio activado y con clave: grabar y transcribir un audio de prueba contra un proveedor simulado | El texto devuelto aparece en la caja de captura sin guardarse solo; el apunte se crea únicamente al tocar Guardar (como A1) |
+| O9 | Pedir transcripción sin clave cargada, sin sesión o sin conexión | Mensaje claro en castellano (“falta configurar”, “iniciá sesión” o “sin conexión”), 401 sin sesión, y la captura por texto sigue funcionando sin perder lo escrito |
+| O10 | Mandar audio y revisar disco, base de datos y registros; mandar uno de más de 10 MB y uno de un tipo no permitido | El audio no se guarda en ningún lado y el servidor lo descarta tras la respuesta; los excesos reciben 413 y 415 con mensaje en castellano |
+| O11 | El proveedor falla, no responde o devuelve cuota agotada | Mensaje en castellano, lo escrito en la caja no se pierde y la app y la sincronización siguen normales |
+| O12 | Activar y desactivar el audio desde Ajustes; revisar respuestas, registros y el código del cliente | Exige sesión (401 sin ella), el estado se guarda en el servidor y la clave del proveedor no aparece en respuestas, registros ni en el cliente |
 
 ## 5. Arquitectura y tecnologías
 
@@ -248,6 +254,7 @@ El proyecto necesita cuatro secretos (más los de las funciones opcionales que a
 | SESSION\_SECRET | Firmar los tokens de sesión | Cadena aleatoria de 32 bytes que genera el script de arranque | Secreto de Fly.io |
 | B2\_KEY\_ID, B2\_APP\_KEY, B2\_BUCKET (opcional) | Respaldo externo en Backblaze B2 (plan gratuito de 10 GB, destino elegido en DECISIONES.md) | Application key de B2 limitada a ese único bucket, con permisos de listar, leer, escribir y borrar archivos solo ahí | Secretos de Fly.io |
 | RESPALDO\_CLAVE (opcional) | Cifrar el respaldo antes de subirlo a un tercero (AES-256-GCM) | Cadena aleatoria de 32 bytes que genera el script de arranque. Guardala aparte (gestor de contraseñas): sin ella el respaldo externo no se puede abrir | Secreto de Fly.io y copia tuya fuera de Fly |
+| GROQ\_API\_KEY (opcional) | Transcribir audio de la captura rápida con Whisper en Groq (plan gratuito, elegido en DECISIONES.md); la clave vive solo en el servidor | API key de Groq creada solo para esto (Groq no tiene permisos por clave; usar una clave dedicada y revocarla si se filtra) | Secreto de Fly.io |
 
 **Reglas**
 

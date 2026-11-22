@@ -31,6 +31,8 @@ export interface Config {
   produccion: boolean;
   /** Ausente = respaldo externo sin configurar (no es un error). */
   respaldoExterno: ClavesRespaldo | null;
+  /** GROQ_API_KEY opcional: ausente = entrada por audio sin configurar (no es un error). */
+  groqApiKey: string | null;
 }
 
 export const CONTRASENA_DE_DESARROLLO = "desarrollo";
@@ -83,5 +85,6 @@ export async function leerConfig(
     secretos: { passwordHash: passwordHash as string, sessionSecret: sessionSecret as string },
     produccion,
     respaldoExterno: leerClavesRespaldo(env),
+    groqApiKey: env["GROQ_API_KEY"] || null,
   };
 }

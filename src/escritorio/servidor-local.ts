@@ -9,7 +9,7 @@ import { extname, join, normalize, resolve, sep } from "node:path";
 
 export const PUERTO_POR_DEFECTO = 47821;
 export const SERVIDOR_POR_DEFECTO = "https://lean-os.fly.dev";
-const RUTAS_PROXY = ["/auth", "/sync", "/export", "/ajustes"] as const;
+const RUTAS_PROXY = ["/auth", "/sync", "/export", "/ajustes", "/audio"] as const;
 const LIMITE_CUERPO = 50 * 1024 * 1024;
 const TIMEOUT_POR_DEFECTO_MS = 30_000;
 

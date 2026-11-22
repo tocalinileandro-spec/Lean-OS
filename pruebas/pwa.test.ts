@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
@@ -8,10 +9,11 @@ import { ARCHIVOS_APP, cachesObsoletas, decidir, nombreDeCache } from "../src/cl
 import { montarEstaticos } from "../src/servidor/estaticos.ts";
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
-const dist = join(raiz, "dist");
+// Carpeta propia: no se comparte con `npm run build` ni con otras pruebas.
+const dist = join(mkdtempSync(join(tmpdir(), "lean-os-pwa-")), "dist");
 
 beforeAll(() => {
-  const r = spawnSync(process.execPath, ["build.ts"], { cwd: raiz, encoding: "utf8" });
+  const r = spawnSync(process.execPath, ["build.ts"], { cwd: raiz, encoding: "utf8", env: { ...process.env, LEAN_OS_DIST: dist } });
   expect(r.status, r.stderr).toBe(0);
 }, 60_000);
 

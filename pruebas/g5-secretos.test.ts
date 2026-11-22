@@ -17,9 +17,10 @@ export const PATRONES: { nombre: string; re: RegExp }[] = [
   { nombre: "token de Fly (fm2)", re: /\bfm[12]_[A-Za-z0-9+/=_-]{20,}/ },
   { nombre: "token de GitHub", re: /\b(github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{30,})/ },
   { nombre: "clave privada PEM", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
+  { nombre: "clave de Groq", re: /\bgsk_[A-Za-z0-9]{20,}/ },
   { nombre: "hash argon2", re: /\$argon2(?:id|i|d)\$v=\d+\$m=\d+/ },
 ];
-const ASIGNACION = /\b(SESSION_SECRET|APP_PASSWORD_HASH|FLY_API_TOKEN|B2_APP_KEY|B2_KEY_ID|RESPALDO_CLAVE)[ \t]*=[ \t]*(\S*)/g;
+const ASIGNACION = /\b(SESSION_SECRET|APP_PASSWORD_HASH|FLY_API_TOKEN|B2_APP_KEY|B2_KEY_ID|RESPALDO_CLAVE|GROQ_API_KEY)[ \t]*=[ \t]*(\S*)/g;
 
 /** Una asignación es un secreto real si tiene un valor que no es un marcador (<...>, $VAR, %VAR%, ..., vacío). */
 export function valorReal(valorCrudo: string): boolean {
@@ -69,6 +70,9 @@ describe("G5: el escaneo de secretos da vacío", () => {
     expect(buscar("APP_PASSWORD_HASH='abc'")).toHaveLength(1);
     expect(buscar("B2_APP_KEY=K005abcdef")).toHaveLength(1);
     expect(buscar("RESPALDO_CLAVE=AbC+/123=")).toHaveLength(1);
+    expect(buscar("GROQ_API_KEY=abc123")).toHaveLength(1);
+    expect(buscar("GROQ_API_KEY='<tu clave de Groq>'")).toHaveLength(0);
+    expect(buscar("clave gsk_" + "a1B2".repeat(8))).toContain("clave de Groq");
     expect(buscar("RESPALDO_CLAVE=")).toHaveLength(0);
     expect(buscar("B2_APP_KEY='<tu application key>'")).toHaveLength(0);
     expect(buscar("SESSION_SECRET=")).toHaveLength(0);
