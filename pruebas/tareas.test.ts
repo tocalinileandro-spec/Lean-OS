@@ -127,6 +127,38 @@ describe("tareas y metas", () => {
     expect(sola.padre_id).toBeNull();
   });
 
+  it("rechaza fechas inexistentes al crear y editar tareas", async () => {
+    const { a, r } = nuevo();
+    await expect(crearTarea(a, r, { titulo: "x", fecha: "2026-13-45" })).rejects.toThrow();
+    await expect(crearTarea(a, r, { titulo: "x", fecha: "2026-02-31" })).rejects.toThrow();
+    const t = await crearTarea(a, r, { titulo: "x", fecha: "2028-02-29" });
+    await expect(editarTarea(a, r, t.id, { fecha: "2026-02-31" })).rejects.toThrow();
+    expect((await a.tareas.obtener(t.id))!.fecha).toBe("2028-02-29");
+  });
+
+  it("editarMeta: el padre debe ser una anual viva, distinta de la propia; las anuales no tienen padre", async () => {
+    const { a, r } = nuevo();
+    const an = await crearMetaAnual(a, r, { anio: 2026, titulo: "A" });
+    const an2 = await crearMetaAnual(a, r, { anio: 2027, titulo: "B" });
+    const tr = await crearMetaTrimestral(a, r, { anio: 2026, trimestre: 1, titulo: "T" });
+    const tr2 = await crearMetaTrimestral(a, r, { anio: 2026, trimestre: 2, titulo: "T2" });
+    expect((await editarMeta(a, r, tr.id, { padre_id: an.id })).padre_id).toBe(an.id);
+    expect((await editarMeta(a, r, tr.id, { padre_id: null })).padre_id).toBeNull();
+    await expect(editarMeta(a, r, tr.id, { padre_id: tr.id })).rejects.toThrow();
+    await expect(editarMeta(a, r, tr.id, { padre_id: tr2.id })).rejects.toThrow();
+    await expect(editarMeta(a, r, tr.id, { padre_id: "nada" })).rejects.toThrow();
+    await expect(editarMeta(a, r, an.id, { padre_id: an2.id })).rejects.toThrow();
+    await borrarMeta(a, r, an2.id);
+    await expect(editarMeta(a, r, tr.id, { padre_id: an2.id })).rejects.toThrow();
+  });
+
+  it("desmarcar una tarea pendiente no cambia updated_at", async () => {
+    const { a, r } = nuevo();
+    const t = await crearTarea(a, r, { titulo: "x" });
+    r.avanzarMinutos(5);
+    expect(await desmarcarHecha(a, r, t.id)).toEqual(t);
+  });
+
   it("la purga elimina metas y tareas con 30 días o más en la papelera", async () => {
     const { a, r } = nuevo();
     const m = await crearMetaAnual(a, r, { anio: 2026, titulo: "A" });

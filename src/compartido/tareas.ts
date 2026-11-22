@@ -5,6 +5,7 @@
 import type { Almacen } from "./almacen.ts";
 import { diaLogico } from "./dia.ts";
 import type { EstadoMeta, FechaISO, Id, Meta, Tarea, Trimestre } from "./esquema.ts";
+import { esFechaReal } from "./importacion/validacion.ts";
 import { construirCola } from "./repaso.ts";
 import type { Reloj } from "./reloj.ts";
 
@@ -13,7 +14,7 @@ const ahoraDe = (r: Reloj) => r.ahora().toISOString();
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 function validarFecha(f: FechaISO | null | undefined): void {
-  if (f !== null && f !== undefined && !FECHA.test(f)) throw new Error(`Fecha inválida (usá AAAA-MM-DD): ${f}`);
+  if (f !== null && f !== undefined && !(FECHA.test(f) && esFechaReal(f))) throw new Error(`Fecha inválida (usá AAAA-MM-DD): ${f}`);
 }
 function validarTitulo(t: string): string {
   if (!t.trim()) throw new Error("El título no puede estar vacío");
@@ -63,8 +64,12 @@ export async function editarMeta(almacen: Almacen, reloj: Reloj, id: Id, c: { ti
   const nueva: Meta = { ...m, updated_at: ahoraDe(reloj) };
   if (c.titulo !== undefined) nueva.titulo = validarTitulo(c.titulo);
   if (c.padre_id !== undefined) {
-    if (m.tipo === "anual" && c.padre_id !== null) throw new Error("Una meta anual no tiene padre");
-    if (c.padre_id !== null) await metaViva(almacen, c.padre_id);
+    if (c.padre_id !== null) {
+      if (m.tipo === "anual") throw new Error("Una meta anual no tiene padre");
+      if (c.padre_id === id) throw new Error("Una meta no puede colgar de sí misma");
+      const p = await almacen.metas.obtener(c.padre_id);
+      if (!p || p.deleted_at !== null || p.tipo !== "anual") throw new Error(`Meta anual inexistente: ${c.padre_id}`);
+    }
     nueva.padre_id = c.padre_id;
   }
   await almacen.metas.guardar(nueva);
@@ -156,6 +161,7 @@ export async function marcarHecha(almacen: Almacen, reloj: Reloj, id: Id): Promi
 
 export async function desmarcarHecha(almacen: Almacen, reloj: Reloj, id: Id): Promise<Tarea> {
   const t = await tareaViva(almacen, id);
+  if (t.estado === "pendiente") return t;
   const nueva: Tarea = { ...t, estado: "pendiente", hecha_en: null, updated_at: ahoraDe(reloj) };
   await almacen.tareas.guardar(nueva);
   return nueva;
