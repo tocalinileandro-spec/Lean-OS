@@ -149,7 +149,12 @@ export class SesionRepaso {
   #cola: Id[];
   #historial: { res: ResultadoCalificacion; colaAntes: Id[] }[] = [];
 
-  constructor(private almacen: Almacen, private reloj: Reloj, cola: Tarjeta[]) {
+  private almacen: Almacen;
+  private reloj: Reloj;
+
+  constructor(almacen: Almacen, reloj: Reloj, cola: Tarjeta[]) {
+    this.almacen = almacen;
+    this.reloj = reloj;
     this.#cola = cola.map((t) => t.id);
   }
 

@@ -105,17 +105,29 @@ export type Programar = (accion: () => void, ms: number) => unknown;
 export class PlanificadorDiario {
   #timer: unknown = null;
   #activo = false;
+  private reloj: Reloj;
+  private accion: () => void;
+  private programar: Programar;
+  private cancelar: (t: unknown) => void;
+  private alFallar: (e: unknown) => void;
+  // Sin "parameter properties": Node ejecuta los .ts borrando tipos y no las soporta.
   constructor(
-    private reloj: Reloj,
-    private accion: () => void,
-    private programar: Programar = (f, ms) => {
+    reloj: Reloj,
+    accion: () => void,
+    programar: Programar = (f, ms) => {
       const t = setTimeout(f, ms);
       t.unref();
       return t;
     },
-    private cancelar: (t: unknown) => void = (t) => clearTimeout(t as NodeJS.Timeout),
-    private alFallar: (e: unknown) => void = () => {},
-  ) {}
+    cancelar: (t: unknown) => void = (t) => clearTimeout(t as NodeJS.Timeout),
+    alFallar: (e: unknown) => void = () => {},
+  ) {
+    this.reloj = reloj;
+    this.accion = accion;
+    this.programar = programar;
+    this.cancelar = cancelar;
+    this.alFallar = alFallar;
+  }
 
   iniciar(): void {
     this.#activo = true;

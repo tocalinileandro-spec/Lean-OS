@@ -150,10 +150,12 @@ function iguales(a: Fila, b: Fila, campos: readonly string[]): boolean {
 class Aplicador {
   aceptados = 0;
   conflictos: Conflicto[] = [];
-  constructor(
-    private db: DatabaseSync,
-    private ahoraMs: number,
-  ) {}
+  private db: DatabaseSync;
+  private ahoraMs: number;
+  constructor(db: DatabaseSync, ahoraMs: number) {
+    this.db = db;
+    this.ahoraMs = ahoraMs;
+  }
 
   private acotar(r: Fila): Fila {
     const c = { ...r };
