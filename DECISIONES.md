@@ -30,3 +30,14 @@ Formato: fecha, qué se eligió, por qué.
 - **Área con más de 2 niveles** ("A > B > C") se rechaza nombrando el campo "area". "resumen" es opcional: sin resumen no se crea apunte. Título del apunte importado = tema.
 - **Subárea:** se resuelve por nombre normalizado bajo su área padre; la tarjeta apunta a la subárea (o al área si no hay).
 - **IDS_EXIGIBLES** ampliado con I1-I7.
+
+## 2026-11-22 (fase 2, F2-b: repaso)
+
+- **Código en `src/compartido/repaso.ts`:** `calificar` (pura, recibe el día lógico), `calificarYGuardar`, `deshacerCalificacion`, `construirCola` y `SesionRepaso` (cola en memoria con reencolado de "Otra vez").
+- **Coma flotante:** ease se redondea a 2 decimales; los productos se redondean a 6 decimales antes del redondeo entero (mitad hacia arriba). Tope 365 días aplicado al final.
+- **Ease en el intervalo:** Bien y Fácil usan el ease previo a la calificación (Fácil además lo sube 0,15 después de calcular). Por eso Fácil con intervalo 4 da luego 4×2,65×1,3.
+- **Deshacer (Ctrl+Z):** restaura ease, intervalo, reps, lapses y vence de la tarjeta y agrega un repaso compensatorio con `anula_a` = id del original y valores invertidos. Es lo más simple que respeta "solo agrega" y no pierde datos. Se amplió `Repaso` con el campo opcional `anula_a`. `repasosVigentes()` descarta originales anulados y compensaciones (para estadísticas futuras).
+- **Orden de guardado:** primero el repaso, después la tarjeta: si se corta entre ambos, la tarjeta sigue vencida y no se pierde nada.
+- **Nueva:** intervalo 0, reps 0, lapses 0 y sin repasos vigentes. Una tarjeta calificada "Otra vez" ya no es nueva (lapses 1): entra como vencida (vence hoy).
+- **Límite de nuevas:** 20 por defecto (`NUEVAS_POR_DIA`), parámetro `limiteNuevas`. Las nuevas ya repasadas hoy (primer repaso vigente en el día lógico actual) descuentan del límite, así reabrir la app no da otras 20. Nuevas en orden de creación.
+- **Cola:** vencidas = vence <= hoy, más atrasadas primero (empate: orden de inserción). Excluye suspendidas y borradas.

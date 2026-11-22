@@ -66,6 +66,8 @@ export interface Repaso extends Registro {
   ease_despues: number;
   intervalo_antes: number;
   intervalo_despues: number;
+  /** Si es una compensación por "deshacer": id del repaso que anula (el registro original no se toca). */
+  anula_a?: Id | null;
 }
 
 export type TipoMeta = "anual" | "trimestral";
