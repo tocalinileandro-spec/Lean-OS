@@ -4,6 +4,7 @@ import { RelojReal } from "../compartido/reloj.ts";
 import { AlmacenIndexedDB } from "./almacen-indexeddb.ts";
 import { AlmacenSincronizado, Candado } from "./sync/cola.ts";
 import { MotorSync } from "./sync/motor.ts";
+import { iniciarPurga } from "./purga.ts";
 import { montarApp } from "./ui/app.ts";
 import { cargarAjustes } from "./ui/logica.ts";
 
@@ -24,6 +25,8 @@ async function arrancar(): Promise<void> {
       alFallarCola: () => motor?.pedirSubidaCompleta(),
     });
     motor = new MotorSync({ almacen: crudo, cola, fetch: (url, init) => fetch(url, init), reloj, persistencia, eventos: window, candado });
+    // Purga local de la papelera (30 días) antes de dibujar; el almacén decorado no anota la purga en la cola.
+    await iniciarPurga(almacen, reloj);
     montarApp(raiz, { almacen, reloj, persistencia, sync: motor });
     motor.iniciar();
   } catch {
