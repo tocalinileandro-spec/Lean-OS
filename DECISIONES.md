@@ -16,3 +16,17 @@ Formato: fecha, qué se eligió, por qué.
 - **Esquema (`src/compartido/esquema.ts`):** `rev` es `number | null` (null hasta que el servidor lo asigna). Los repasos también llevan `deleted_at` por uniformidad (siempre null, solo se agregan). Tarjeta lleva `contenido_updated_at` y `repaso_updated_at` además de `updated_at`. Las fechas locales son AAAA-MM-DD y los instantes ISO en UTC. Las áreas se modelan con `padre_id` (Área > Subárea).
 - **Reloj:** interfaz `Reloj` con `ahora(): Date`; `RelojReal` y `RelojSimulado` (fijar/avanzar). El cambio de día a las 04:00 de Buenos Aires se implementará en la fase 2 sobre esta interfaz.
 - **CI en `ci/ci.yml`:** checkout, setup-node 22, `npm ci`, `npm run verificar`; sin despliegue. El dueño lo copia a `.github/workflows/`.
+
+## 2026-11-22 (fase 2, F2-a: importación)
+
+- **Almacén:** interfaz `Almacen` (`src/compartido/almacen.ts`) con repositorios asíncronos por tabla (`obtener`, `listar`, `guardar`, `guardarVarios`); cada método es una transacción, así IndexedDB es directo. `listar` oculta los borrados salvo `incluirBorrados`. Repasos: solo `agregar` (idempotente por id) y listar. Implementación `AlmacenMemoria` para pruebas.
+- **diaLogico(reloj, horaCambio, zona)** en `src/compartido/dia.ts`: resta la hora de cambio al instante y toma la fecha local con `Intl`. Sin dependencias.
+- **I4, texto en la caja:** el informe devuelve `texto_original` (el texto pegado sin tocar); la UI lo deja en la caja cuando hay errores. La limpieza conserva el largo del texto, así la posición del error coincide con el texto pegado.
+- **Posición del error:** si el JSON está cortado, la posición es el final del texto; si es inválido, la que informa `JSON.parse`. Se muestra posición, línea y columna.
+- **Bloques:** se aceptan objetos pegados juntos y arreglos (cada elemento es un bloque). Un trozo ilegible se informa como error y no frena a los demás (la importación es idempotente, así que reintentar es seguro). Errores de bloque llevan el prefijo "Bloque N:" si hay más de uno.
+- **Duplicadas:** se comparan solo contra tarjetas vivas (no borradas) del mismo área/subárea final, y también dentro del mismo bloque. Si el usuario deshace una importación y reimporta, se vuelven a crear. Aviso si la respuesta normalizada difiere.
+- **Sin tarjetas nuevas** (todas duplicadas) no se registra importación ni apunte: así el reimport no duplica el resumen y "deshacer" apunta siempre a una importación con efecto.
+- **Una importación por bloque** (el esquema no tiene lote). Deshacer revierte la última (por `created_at`, empate: la más reciente insertada) y la marca borrada; deshacer otra vez retrocede a la anterior. Las tarjetas ya editadas también van a la papelera (recuperables).
+- **Área con más de 2 niveles** ("A > B > C") se rechaza nombrando el campo "area". "resumen" es opcional: sin resumen no se crea apunte. Título del apunte importado = tema.
+- **Subárea:** se resuelve por nombre normalizado bajo su área padre; la tarjeta apunta a la subárea (o al área si no hay).
+- **IDS_EXIGIBLES** ampliado con I1-I7.
