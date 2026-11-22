@@ -2,7 +2,7 @@
  * Prueba el Lean-OS.exe ya construido (B2 y S1 dentro del .exe). Solo Windows.
  * Uso (desde la raíz): `node escritorio/probar-exe.ts [ruta\al\Lean-OS.exe]` (por defecto escritorio/salida/Lean-OS.exe).
  * Corre los modos salud, s1-escribir y s1-leer con carpetas de datos temporales (nunca los datos reales).
- * El resultado se lee de <datos>/resultado-prueba.txt (el .exe no siempre enlaza stdout) y del código de salida.
+ * El resultado se lee de <datos>/resultado-prueba.txt (el .exe no siempre enlaza stdout) y exige además que el código de salida real del .exe sea 0.
  */
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -41,8 +41,8 @@ async function paso(modo: string, datos: string, marca: string): Promise<boolean
   console.log(`--- ${modo} ---`);
   const r = await correr(modo, datos);
   const codigoApp = /CODIGO=(\d+)/.exec(r.salida)?.[1];
-  const ok = !r.vencio && r.salida.includes(marca) && codigoApp === "0";
-  if (r.codigo !== 0) console.warn(`aviso: el .exe terminó con código ${String(r.codigo)} (resultado según el archivo: ${codigoApp ?? "sin datos"})`);
+  const ok = !r.vencio && r.salida.includes(marca) && codigoApp === "0" && r.codigo === 0;
+  if (r.codigo !== 0) console.error(`el .exe terminó con código ${String(r.codigo)} (según el archivo: ${codigoApp ?? "sin datos"})`);
   console.log(ok ? `${modo}: ${marca}` : `${modo}: FALLA${r.vencio ? " (tiempo agotado)" : ""}\n${r.salida}`);
   return ok;
 }

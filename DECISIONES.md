@@ -196,3 +196,7 @@ Formato: fecha, qué se eligió, por qué.
 
 - **Modos de prueba y datos reales:** si `LEAN_OS_PRUEBA` está definida y falta `LEAN_OS_DATOS` (o está vacía), la app falla con un mensaje en castellano antes de crear o tocar ninguna carpeta (sin escribir tarjetas ni borrar `resultado-prueba.txt`) y sale con código 1. La decisión es la función pura `resolverCarpetaDatos` (`src/escritorio/datos.ts`), con prueba B2 en vitest.
 - **Navegación:** `will-redirect` se trata igual que `will-navigate`; si `new URL(url)` falla, la dirección se bloquea. `probar-exe.ts` y el criterio del código de salida no se tocaron (se ajustan tras ver el CI real).
+
+## 2026-11-22 (F5-a, ajuste tras el CI real de Windows)
+
+- El job `exe-windows` pasó en CI real (SALUD_OK, S1_ESCRITO, S1_LEIDO) sin el aviso de código distinto: el portable propaga el código de salida. `probar-exe.ts` ahora exige, además de la marca y `CODIGO=0` en `resultado-prueba.txt`, que el código de salida real del .exe sea 0 (si no, falla). Se mantiene el archivo como fuente de la marca porque stdout no siempre está enlazado. Esto reemplaza lo dicho antes sobre "solo avisar" si el código difiere.
