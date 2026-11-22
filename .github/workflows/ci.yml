@@ -22,6 +22,40 @@ jobs:
       - run: npm run build
       - run: npm run verificar
 
+  # App de Windows (B2 y S1 dentro del .exe): compila, empaqueta, prueba el .exe y lo sube como artefacto.
+  # No bloquea el despliegue (`desplegar` solo depende de `verificar`).
+  exe-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Compilar el proceso principal
+        run: node escritorio/compilar.ts
+      - name: Instalar Electron y electron-builder (solo en escritorio/)
+        run: npm ci
+        working-directory: escritorio
+      - name: Empaquetar Lean-OS.exe
+        run: npm run empaquetar
+        working-directory: escritorio
+      - name: Probar el .exe (B2 salud y S1 escribir y leer)
+        run: node escritorio/probar-exe.ts escritorio/salida/Lean-OS.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lean-OS-exe
+          path: escritorio/salida/Lean-OS.exe
+          retention-days: 30
+          if-no-files-found: error
+
   # Despliegue (B3): solo en push a main y solo si `verificar` quedó verde. Sin FLY_API_TOKEN se saltea con un aviso (no falla).
   desplegar:
     needs: verificar
