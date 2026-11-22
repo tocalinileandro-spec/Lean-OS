@@ -60,7 +60,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
 
   /** Serializa las acciones: una a la vez, y siempre se redibuja al final. */
   function accion(f: () => Promise<void> | void): void {
-    cola = cola.then(f).catch((e) => { aviso = mensajeDeError(e); }).then(dibujar);
+    cola = cola.then(() => { aviso = ""; errorAjustes = ""; return f(); }).catch((e) => { aviso = mensajeDeError(e); }).then(dibujar);
   }
 
   function ir(p: Pantalla): void {

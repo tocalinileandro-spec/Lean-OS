@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AlmacenIndexedDB } from "../src/cliente/almacen-indexeddb.ts";
 import { montarApp, type AppMontada } from "../src/cliente/ui/app.ts";
 import { cargarAjustes, formatearFecha, type Persistencia } from "../src/cliente/ui/logica.ts";
+import { borrarTarjeta } from "../src/compartido/gestion.ts";
 import { fijarHoraCambio } from "../src/compartido/dia.ts";
 import { RelojSimulado } from "../src/compartido/reloj.ts";
 
@@ -175,6 +176,17 @@ describe("interfaz web", () => {
     await ui.clic("Ver papelera (1)");
     await ui.clic("Restaurar");
     expect(ui.raiz.textContent).toContain("Tarjeta restaurada.");
+  });
+
+  it("si las tarjetas se borran desde otra pestaña, Espacio y 3 no muestran errores internos", async () => {
+    const { ui } = await conTarjetas();
+    ui.app.ir("repaso");
+    await ui.app.esperar();
+    for (const t of await ui.almacen.tarjetas.listar()) await borrarTarjeta(ui.almacen, new RelojSimulado("2026-11-22T15:00:00.000Z"), t.id);
+    await ui.tecla(" ");
+    await ui.tecla("3");
+    expect(ui.raiz.textContent).toContain("No hay tarjetas para repasar ahora.");
+    expect(ui.raiz.textContent).not.toMatch(/cola|Completalo|Error/);
   });
 
   it("formatearFecha usa dd/mm/aaaa", () => {

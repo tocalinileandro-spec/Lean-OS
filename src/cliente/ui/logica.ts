@@ -42,7 +42,7 @@ export function textoIntervalo(dias: number): string {
 /** Nunca se muestra un error técnico crudo: mensaje en castellano que dice qué hacer. */
 export function mensajeDeError(error: unknown): string {
   const t = error instanceof Error ? error.message : "";
-  if (/vacía/.test(t)) return t.replace(/^Error:\s*/, "") + ". Completalo y volvé a guardar.";
+  if (/no puede quedar vacía/.test(t)) return t.replace(/^Error:\s*/, "") + ". Completalo y volvé a guardar.";
   return "No se pudo completar la acción. Probá de nuevo; si sigue fallando, recargá la página (tus datos están guardados).";
 }
 
@@ -144,8 +144,13 @@ export class PantallaRepaso {
     return new PantallaRepaso(d, new SesionRepaso(d.almacen, d.reloj, cola));
   }
 
-  verRespuesta(): void { this.#respuestaVisible = true; }
-  verPista(): void { this.#pistaVisible = true; }
+  /** Sin tarjeta actual (por ejemplo, la borraron desde otra pestaña) no hace nada. */
+  async verRespuesta(): Promise<void> {
+    if ((await this.sesion.siguiente()) !== undefined) this.#respuestaVisible = true;
+  }
+  async verPista(): Promise<void> {
+    if ((await this.sesion.siguiente()) !== undefined) this.#pistaVisible = true;
+  }
 
   async vista(): Promise<VistaRepaso> {
     const id = await this.sesion.siguiente();
@@ -175,7 +180,7 @@ export class PantallaRepaso {
 
   /** Solo califica si ya se vio la respuesta. */
   async calificar(boton: Calificacion): Promise<void> {
-    if (!this.#respuestaVisible) return;
+    if (!this.#respuestaVisible || (await this.sesion.siguiente()) === undefined) return;
     await this.sesion.calificar(boton);
     this.#calificadas++;
     this.#respuestaVisible = false;
