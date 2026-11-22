@@ -53,6 +53,7 @@ export function mensajeDeError(error: unknown): string {
   const t = error instanceof Error ? error.message : "";
   if (/no puede (quedar|estar) (vacía|vacío)/.test(t)) return t.replace(/^Error:\s*/, "") + ". Completalo y volvé a guardar.";
   if (/^(Fecha inválida|El año no es válido)/.test(t)) return "La fecha o el año no son válidos. Revisalos y volvé a guardar.";
+  if (/^(Elegí al menos un día|Los días de la semana|Hay días de la semana|El día del mes|La regla de repetición|El tipo de repetición)/.test(t)) return `${t}. Revisalo y volvé a guardar.`;
   return "No se pudo completar la acción. Probá de nuevo; si sigue fallando, recargá la página (tus datos están guardados).";
 }
 

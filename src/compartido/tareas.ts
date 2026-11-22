@@ -5,6 +5,7 @@
 import type { Almacen } from "./almacen.ts";
 import { diaLogico } from "./dia.ts";
 import type { EstadoMeta, FechaISO, Id, Meta, Tarea, Trimestre } from "./esquema.ts";
+import { idOcurrencia, proximaFecha, validarRepeticion, type Repeticion } from "./recurrencia.ts";
 import { esFechaReal } from "./importacion/validacion.ts";
 import { construirCola } from "./repaso.ts";
 import type { Reloj } from "./reloj.ts";
@@ -125,6 +126,7 @@ export interface DatosTarea {
   fecha?: FechaISO | null;
   meta_id?: Id | null;
   nota?: string | null;
+  repeticion?: Repeticion | null;
 }
 
 export async function crearTarea(almacen: Almacen, reloj: Reloj, datos: DatosTarea): Promise<Tarea> {
@@ -136,6 +138,7 @@ export async function crearTarea(almacen: Almacen, reloj: Reloj, datos: DatosTar
     titulo: validarTitulo(datos.titulo), fecha: datos.fecha ?? null, meta_id: datos.meta_id ?? null,
     nota: datos.nota ?? null, estado: "pendiente", hecha_en: null,
   };
+  if (datos.repeticion) t.repeticion = validarRepeticion(datos.repeticion);
   await almacen.tareas.guardar(t);
   return t;
 }
@@ -155,7 +158,24 @@ export async function marcarHecha(almacen: Almacen, reloj: Reloj, id: Id): Promi
   if (t.estado === "hecha") return t;
   const ahora = ahoraDe(reloj);
   const nueva: Tarea = { ...t, estado: "hecha", hecha_en: ahora, updated_at: ahora };
-  await almacen.tareas.guardar(nueva);
+  if (!t.repeticion) {
+    await almacen.tareas.guardar(nueva);
+    return nueva;
+  }
+  // Recurrente: la siguiente ocurrencia se crea en el mismo lote, con id determinista (no se duplica ni se pisa).
+  const serie = t.serie_id ?? t.id;
+  nueva.serie_id = serie;
+  const fecha = proximaFecha(t.repeticion, t.fecha, diaLogico(reloj));
+  const idSig = idOcurrencia(serie, fecha);
+  const tareas: Tarea[] = [nueva];
+  if (!(await almacen.tareas.obtener(idSig))) {
+    tareas.push({
+      id: idSig, created_at: ahora, updated_at: ahora, deleted_at: null, rev: null,
+      titulo: t.titulo, fecha, meta_id: t.meta_id, nota: t.nota, estado: "pendiente", hecha_en: null,
+      repeticion: structuredClone(t.repeticion), serie_id: serie,
+    });
+  }
+  await almacen.guardarLote({ tareas });
   return nueva;
 }
 
@@ -180,9 +200,13 @@ export async function editarTarea(almacen: Almacen, reloj: Reloj, id: Id, c: Par
     nueva.meta_id = c.meta_id;
   }
   if (c.nota !== undefined) nueva.nota = c.nota;
+  if (c.repeticion !== undefined) nueva.repeticion = c.repeticion === null ? null : validarRepeticion(c.repeticion);
   await almacen.tareas.guardar(nueva);
   return nueva;
 }
+
+/** "Dejar de repetir": quita la regla (la serie_id queda). La ocurrencia ya creada sigue como tarea común. */
+export const detenerRepeticion = (almacen: Almacen, reloj: Reloj, id: Id) => editarTarea(almacen, reloj, id, { repeticion: null });
 
 export async function borrarTarea(almacen: Almacen, reloj: Reloj, id: Id): Promise<Tarea> {
   const t = await tareaViva(almacen, id);

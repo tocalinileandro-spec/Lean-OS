@@ -85,6 +85,9 @@ export interface Meta extends Registro {
   padre_id: Id | null;
 }
 
+import type { Repeticion } from "./recurrencia.ts";
+export type { Repeticion };
+
 export type EstadoTarea = "pendiente" | "hecha";
 
 export interface Tarea extends Registro {
@@ -94,6 +97,10 @@ export interface Tarea extends Registro {
   nota: string | null;
   estado: EstadoTarea;
   hecha_en: InstanteUTC | null;
+  /** Regla de repetición (opcional; ausente o null = no se repite). */
+  repeticion?: Repeticion | null;
+  /** Serie a la que pertenece la ocurrencia (opcional). */
+  serie_id?: Id | null;
 }
 
 export const TIPOS_APUNTE = ["idea", "apunte", "aprendizaje"] as const;
