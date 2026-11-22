@@ -255,7 +255,7 @@ El proyecto necesita cuatro secretos, todos con el menor permiso posible, y se c
 
 Cuatro fases esenciales en orden y una quinta opcional (la app de Windows). Cada una deja la app funcionando y termina cuando sus pruebas (sección 4) están verdes.
 
-1. **Base.** Leer el prototipo en Python (queda como referencia en la carpeta prototipo/, sin modificarlo), crear el repositorio, definir el esquema de datos, armar `npm run verificar`, la integración continua (escrita en la carpeta ci/, para que el dueño la copie a .github/workflows) y los archivos DECISIONES.md y ESTADO.md. Termina cuando: B1 corre.
+1. **Base.** Leer el prototipo en Python (queda como referencia en la carpeta prototipo/, sin modificarlo), crear el repositorio, definir el esquema de datos, armar `npm run verificar`, la integración continua (en .github/workflows/ci.yml) y los archivos DECISIONES.md y ESTADO.md. Termina cuando: B1 corre.
 2. **Tarjetas en local.** Importación, repaso con repetición espaciada, estadísticas mínimas, papelera y copia local. Termina cuando: I1 a I7, R1 a R9 y S1 en el navegador.
 3. **Tareas y apuntes.** Metas, tareas, pantalla Hoy y bandeja; apuntes con captura rápida, búsqueda y conversiones. Termina cuando: T1, T2, A1 y A2.
 4. **Servidor y sincronización.** Servidor en Node con TypeScript y SQLite, login, sincronización, respaldos, exportación, PWA instalable en el celular y despliegue en Fly.io. Termina cuando: S2 a S7, G1 a G5 y B3.
