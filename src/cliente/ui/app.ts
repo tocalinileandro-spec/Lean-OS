@@ -26,6 +26,9 @@ import {
   ESTADOS_META, etiquetaMeta, itemsPapelera, nombreTipoPapelera, restaurarItem, separarEtiquetas, textoProgreso,
   vistaApuntes, vistaTareas, type MetaConProgreso,
 } from "./logica-tareas.ts";
+import type { Estadisticas } from "../../compartido/estadisticas.ts";
+import { datosGraficos } from "../../compartido/graficos.ts";
+import { graficoRepasosPorDia, graficoRetencion, graficoTarjetasPorArea, graficoTareasPorSemana } from "./graficos-svg.ts";
 import { renderizarMarkdown } from "./markdown.ts";
 import { detalleEstado, formatearInstante, textoEstado } from "../sync/estado.ts";
 import { exportarLocal, importarRespaldo, lineasDeInforme, type InformeRespaldo } from "../sync/respaldo.ts";
@@ -37,7 +40,7 @@ const PANTALLAS: { id: Pantalla; titulo: string }[] = [
 ];
 const TIPOS_NOMBRE: Record<TipoApunte, string> = { idea: "Idea", apunte: "Apunte", aprendizaje: "Aprendizaje" };
 /** Campos que conservan el foco al redibujar (se está escribiendo en ellos). */
-const CAMPOS_CON_FOCO = ["busqueda", "busqueda-apuntes", "tarea-rapida"];
+const CAMPOS_CON_FOCO = ["busqueda", "busqueda-apuntes", "tarea-rapida", "ver-estadisticas"];
 
 type Hijo = Node | string | null | false | undefined;
 type Props = Record<string, string | number | boolean | ((ev: Event) => void) | undefined>;
@@ -115,6 +118,8 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     return form;
   }
   let cola: Promise<void> = Promise.resolve();
+  /** Panel de estadísticas de Hoy (solo lee datos; no es una pantalla de la navegación). */
+  let panelEstadisticas = false;
 
   /** Serializa las acciones: una a la vez, y siempre se redibuja al final. */
   function accion(f: () => Promise<void> | void): void {
@@ -132,6 +137,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   }
 
   function ir(p: Pantalla): void {
+    panelEstadisticas = false;
     if (p !== "apuntes") grabadora?.detener(true);
     accion(async () => {
       pantalla = p;
@@ -261,9 +267,23 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
         h("div", {}, h("dt", {}, "Pendientes hoy"), h("dd", {}, String(e.pendientesHoy))),
         h("div", {}, h("dt", {}, "Repasadas hoy"), h("dd", {}, String(e.repasadasHoy))),
         h("div", {}, h("dt", {}, "Racha"), h("dd", {}, `${e.racha} ${e.racha === 1 ? "día" : "días"}`))),
+      boton(panelEstadisticas ? "Ocultar estadísticas" : "Ver estadísticas", () => { accion(() => { panelEstadisticas = !panelEstadisticas; }); }, "suave",
+        { id: "ver-estadisticas", "aria-expanded": panelEstadisticas ? "true" : "false", "aria-controls": "panel-estadisticas" }),
+      panelEstadisticas && await dibujarPanelEstadisticas(e),
       e.porArea.length > 0 && h("div", {},
         h("h2", {}, "Tarjetas por área"),
         h("ul", { class: "lista" }, ...e.porArea.map((a) => h("li", {}, h("span", {}, a.nombre), h("strong", {}, String(a.total)))))));
+  }
+
+  async function dibujarPanelEstadisticas(e: Estadisticas): Promise<Node> {
+    const g = await datosGraficos(d.almacen, d.reloj);
+    return h("section", { id: "panel-estadisticas", class: "panel-estadisticas", "aria-label": "Estadísticas" },
+      h("h2", {}, "Estadísticas"),
+      h("p", { class: "suave" }, `Pendientes hoy: ${e.pendientesHoy}. Repasadas hoy: ${e.repasadasHoy}. Racha: ${e.racha} ${e.racha === 1 ? "día" : "días"}.`),
+      graficoRepasosPorDia(doc, g.repasosPorDia),
+      graficoRetencion(doc, g.retencion),
+      graficoTarjetasPorArea(doc, g.porArea),
+      graficoTareasPorSemana(doc, g.tareasPorSemana));
   }
 
   /** Fila de tarea con su tilde (marca o desmarca al instante). */
@@ -1038,6 +1058,12 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       const b = (["otra_vez", "dificil", "bien", "facil"] as const)[Number(ke.key) - 1]!;
       accion(() => repaso!.calificar(b));
     }
+  });
+
+  // Escape cierra el panel de estadísticas.
+  doc.addEventListener("keydown", (ev) => {
+    if ((ev as KeyboardEvent).key !== "Escape" || pantalla !== "hoy" || !panelEstadisticas) return;
+    accion(() => { panelEstadisticas = false; });
   });
 
   // Atajo de captura rápida: "n" fuera de los campos de texto abre la caja de apuntes.

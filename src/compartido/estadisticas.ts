@@ -1,7 +1,7 @@
 /** Estadísticas mínimas (módulo 1). Funciones puras sobre el Almacén y el reloj. */
 import type { Almacen } from "./almacen.ts";
 import { diaLogico } from "./dia.ts";
-import type { FechaISO, Id } from "./esquema.ts";
+import type { Area, FechaISO, Id, Tarjeta } from "./esquema.ts";
 import { construirCola, repasosVigentes, sumarDias, type OpcionesCola } from "./repaso.ts";
 import type { Reloj } from "./reloj.ts";
 
@@ -22,6 +22,15 @@ export interface Estadisticas {
   porArea: TotalPorArea[];
 }
 
+/** Tarjetas por área: el Área suma las suyas (sin subárea) más las de sus subáreas; la subárea muestra solo las suyas. */
+export function totalesPorArea(areas: Area[], tarjetas: Tarjeta[]): TotalPorArea[] {
+  const directas = new Map<Id, number>();
+  for (const t of tarjetas) directas.set(t.area_id, (directas.get(t.area_id) ?? 0) + 1);
+  const deHijas = new Map<Id, number>();
+  for (const a of areas) if (a.padre_id) deHijas.set(a.padre_id, (deHijas.get(a.padre_id) ?? 0) + (directas.get(a.id) ?? 0));
+  return areas.map((a) => ({ area_id: a.id, nombre: a.nombre, total: (directas.get(a.id) ?? 0) + (deHijas.get(a.id) ?? 0) }));
+}
+
 const diaDe = (iso: string): FechaISO => diaLogico({ ahora: () => new Date(iso) });
 
 export async function calcularEstadisticas(almacen: Almacen, reloj: Reloj, opcionesCola: OpcionesCola = {}): Promise<Estadisticas> {
@@ -38,12 +47,6 @@ export async function calcularEstadisticas(almacen: Almacen, reloj: Reloj, opcio
   }
   const tarjetas = await almacen.tarjetas.listar();
   const areas = await almacen.areas.listar();
-  const directas = new Map<Id, number>();
-  for (const t of tarjetas) directas.set(t.area_id, (directas.get(t.area_id) ?? 0) + 1);
-  // El Área suma las suyas (sin subárea) más las de sus subáreas; la subárea muestra solo las suyas.
-  const porArea = areas.map((a) => ({
-    area_id: a.id, nombre: a.nombre,
-    total: (directas.get(a.id) ?? 0) + areas.filter((h) => h.padre_id === a.id).reduce((n, h) => n + (directas.get(h.id) ?? 0), 0),
-  }));
+  const porArea = totalesPorArea(areas, tarjetas);
   return { pendientesHoy: (await construirCola(almacen, reloj, opcionesCola)).length, repasadasHoy, racha, porArea };
 }

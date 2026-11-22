@@ -14,11 +14,23 @@ export function fijarHoraCambio(hora: string = HORA_CAMBIO_DE_DIA): void {
  * Se resta la hora de cambio al instante y se toma la fecha local de la zona (Intl, sin dependencias).
  */
 export function diaLogico(reloj: Reloj, horaCambio: string = horaCambioActual, zona: string = ZONA_HORARIA): FechaISO {
+  return diaLogicoDeMs(reloj.ahora().getTime(), horaCambio, zona);
+}
+
+const formateadores = new Map<string, Intl.DateTimeFormat>();
+
+/** Igual que `diaLogico` pero desde un instante en milisegundos; reutiliza el formateador (rápido para miles de registros). */
+export function diaLogicoDeMs(ms: number, horaCambio: string = horaCambioActual, zona: string = ZONA_HORARIA): FechaISO {
   const m = /^(\d{1,2}):(\d{2})$/.exec(horaCambio);
   if (!m) throw new Error(`Hora de cambio inválida: ${horaCambio}`);
   const minutos = Number(m[1]) * 60 + Number(m[2]);
-  const desplazado = new Date(reloj.ahora().getTime() - minutos * 60_000);
-  const partes = new Intl.DateTimeFormat("en-CA", { timeZone: zona, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(desplazado);
+  const desplazado = new Date(ms - minutos * 60_000);
+  let f = formateadores.get(zona);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-CA", { timeZone: zona, year: "numeric", month: "2-digit", day: "2-digit" });
+    formateadores.set(zona, f);
+  }
+  const partes = f.formatToParts(desplazado);
   const g = (t: string) => partes.find((p) => p.type === t)!.value;
   return `${g("year")}-${g("month")}-${g("day")}`;
 }
