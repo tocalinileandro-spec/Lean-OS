@@ -13,17 +13,25 @@ import { normalizar } from "../../compartido/normalizar.ts";
 import { tareasDeHoy } from "../../compartido/tareas.ts";
 import { calificar, construirCola, SesionRepaso } from "../../compartido/repaso.ts";
 import type { Reloj } from "../../compartido/reloj.ts";
+import type { ControlSync } from "../sync/motor.ts";
 
 export interface Dependencias {
   almacen: Almacen;
   reloj: Reloj;
   persistencia: Persistencia;
+  /** Sincronización y cuenta (sin esto la app es solo local y no muestra Cuenta ni el indicador). */
+  sync?: ControlSync;
+  /** Entrega un archivo al usuario (por defecto, descarga del navegador). Se inyecta en pruebas. */
+  descargar?: (nombre: string, texto: string) => void;
+  /** Lee el texto del archivo elegido para importar (por defecto, `file.text()`). */
+  leerArchivo?: (archivo: File) => Promise<string>;
 }
 
 /** Lo mínimo que se usa de localStorage (se inyecta otra cosa en las pruebas). */
 export interface Persistencia {
   getItem(clave: string): string | null;
   setItem(clave: string, valor: string): void;
+  removeItem?(clave: string): void;
 }
 
 // ---------- Formato ----------

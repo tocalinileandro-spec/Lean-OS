@@ -69,3 +69,10 @@ label { display: block; margin: 0.75rem 0; font-weight: 600; } label > * { margi
 .captura, .edicion { display: grid; gap: 0.5rem; }
 .markdown p, .markdown ul, .markdown ol { margin: 0.25rem 0; }
 .markdown a { color: var(--acento); }
+
+/* Sincronización, cuenta y respaldo */
+.cabecera { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.5rem; }
+.estado-sync { align-self: flex-end; border: 1px solid var(--borde); border-radius: 999px; background: var(--superficie); color: var(--suave); font: inherit; font-size: 0.85rem; padding: 0.25rem 0.9rem; cursor: pointer; }
+.estado-sync.estado-sincronizado { color: var(--acento); }
+.estado-sync.estado-sesion_vencida, .estado-sync.estado-error, .estado-sync.estado-confirmacion_pendiente { color: var(--peligro); border-color: var(--peligro); }
+.cuenta, .respaldo { background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio); padding: 0.5rem 1rem 1rem; margin-top: 1rem; }
