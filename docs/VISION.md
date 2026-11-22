@@ -132,7 +132,7 @@ Ante cualquier duda, la app elige lo que no pierde datos y no pregunta; la únic
 
 Una función está terminada solo cuando su prueba pasa sola, sin intervención humana. Un único comando (`npm run verificar`) corre todas las pruebas con reloj simulado y datos de ejemplo, y escribe REPORTE.md con el resultado de cada ID. Para poder simular el tiempo, el código recibe el reloj como dependencia.
 
-Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega.
+Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio, tareas recurrentes y gráficos; cada grupo se agrega antes de construirlo).
 
 | ID | Qué hace la prueba | Resultado esperado |
 | --- | --- | --- |
@@ -171,6 +171,12 @@ Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G se
 | B1 | Correr todas las pruebas en CI | Todas verdes; sin eso no hay despliegue |
 | B2 | Solo con la fase 5: compilar el .exe en un runner de Windows y arrancarlo | Abre, responde en su puerto local de salud y se cierra sin error; no requiere instalar nada más |
 | B3 | Desplegar en Fly.io y consultar /health | Responde “ok” por HTTPS |
+| O1 | Respaldo externo desactivado (valor por defecto) y corre el respaldo nocturno | Se hace el respaldo local de siempre y no se hace ninguna llamada de red a terceros |
+| O2 | Respaldo externo activado en Ajustes y con las claves cargadas; correr el respaldo nocturno contra un destino simulado | Se sube un archivo cifrado con el contenido completo; el archivo subido no contiene texto legible de tarjetas, tareas ni apuntes |
+| O3 | Descifrar el archivo subido con la clave de cifrado y restaurarlo en un servidor vacío | Mismos conteos de cada tipo de dato (como G4); con una clave equivocada no restaura nada y avisa |
+| O4 | Respaldo externo activado pero sin claves, o el destino falla o no responde | El respaldo local se hace igual, la app y la sincronización siguen normales, y Ajustes muestra “falta configurar” o el último error en castellano |
+| O5 | Subir respaldos externos durante más de 30 días simulados | En el destino solo quedan los últimos 30 |
+| O6 | Activar y desactivar el respaldo externo desde Ajustes; revisar los registros del servidor y la salida de una corrida | El estado se guarda en el servidor, exige sesión (401 sin ella) y ningún registro contiene claves ni contenido |
 
 ## 5. Arquitectura y tecnologías
 
@@ -232,7 +238,7 @@ El JSON nocturno vive en el mismo volumen, así que contra la pérdida del volum
 
 ## 7. Secretos y accesos
 
-El proyecto necesita cuatro secretos, todos con el menor permiso posible, y se cargan una sola vez al inicio.
+El proyecto necesita cuatro secretos (más los de las funciones opcionales que actives), todos con el menor permiso posible, y se cargan una sola vez al inicio.
 
 | Secreto | Para qué sirve | Permisos mínimos | Dónde se carga |
 | --- | --- | --- | --- |
@@ -240,6 +246,8 @@ El proyecto necesita cuatro secretos, todos con el menor permiso posible, y se c
 | GITHUB\_TOKEN | Que el agente suba código y lea los resultados de CI | Token de acceso fino limitado a este único repositorio privado: Contents lectura y escritura, Pull requests lectura y escritura, Actions lectura, Metadata lectura. El agente puede escribir .github/workflows; si GitHub rechaza el push de un workflow, deja el archivo en ci/ y lo anota en BLOQUEOS.md | Archivo .env local o login de `gh` |
 | APP\_PASSWORD\_HASH | Contraseña de la app (solo su hash) | No es una clave de un tercero: lo genera un script del repositorio a partir de la contraseña que elijas | Secreto de Fly.io |
 | SESSION\_SECRET | Firmar los tokens de sesión | Cadena aleatoria de 32 bytes que genera el script de arranque | Secreto de Fly.io |
+| B2\_KEY\_ID, B2\_APP\_KEY, B2\_BUCKET (opcional) | Respaldo externo en Backblaze B2 (plan gratuito de 10 GB, destino elegido en DECISIONES.md) | Application key de B2 limitada a ese único bucket, con permisos de listar, leer, escribir y borrar archivos solo ahí | Secretos de Fly.io |
+| RESPALDO\_CLAVE (opcional) | Cifrar el respaldo antes de subirlo a un tercero (AES-256-GCM) | Cadena aleatoria de 32 bytes que genera el script de arranque. Guardala aparte (gestor de contraseñas): sin ella el respaldo externo no se puede abrir | Secreto de Fly.io y copia tuya fuera de Fly |
 
 **Reglas**
 

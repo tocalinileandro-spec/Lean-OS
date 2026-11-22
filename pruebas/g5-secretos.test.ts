@@ -19,7 +19,7 @@ export const PATRONES: { nombre: string; re: RegExp }[] = [
   { nombre: "clave privada PEM", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
   { nombre: "hash argon2", re: /\$argon2(?:id|i|d)\$v=\d+\$m=\d+/ },
 ];
-const ASIGNACION = /\b(SESSION_SECRET|APP_PASSWORD_HASH|FLY_API_TOKEN)[ \t]*=[ \t]*(\S*)/g;
+const ASIGNACION = /\b(SESSION_SECRET|APP_PASSWORD_HASH|FLY_API_TOKEN|B2_APP_KEY|B2_KEY_ID|RESPALDO_CLAVE)[ \t]*=[ \t]*(\S*)/g;
 
 /** Una asignación es un secreto real si tiene un valor que no es un marcador (<...>, $VAR, %VAR%, ..., vacío). */
 export function valorReal(valorCrudo: string): boolean {
@@ -67,6 +67,10 @@ describe("G5: el escaneo de secretos da vacío", () => {
     expect(buscar("SESSION_SECRET=abc123")).toHaveLength(1);
     expect(buscar("set FLY_API_TOKEN=abc")).toHaveLength(1);
     expect(buscar("APP_PASSWORD_HASH='abc'")).toHaveLength(1);
+    expect(buscar("B2_APP_KEY=K005abcdef")).toHaveLength(1);
+    expect(buscar("RESPALDO_CLAVE=AbC+/123=")).toHaveLength(1);
+    expect(buscar("RESPALDO_CLAVE=")).toHaveLength(0);
+    expect(buscar("B2_APP_KEY='<tu application key>'")).toHaveLength(0);
     expect(buscar("SESSION_SECRET=")).toHaveLength(0);
     expect(buscar("APP_PASSWORD_HASH='<pegá el valor>'")).toHaveLength(0);
     expect(buscar("FLY_API_TOKEN=$FLY_API_TOKEN")).toHaveLength(0);
@@ -96,7 +100,7 @@ describe("G5: el escaneo de secretos da vacío", () => {
       expect(ejemplo).toMatch(new RegExp(`^${nombre}=$`, "m"));
     }
     for (const linea of ejemplo.split(/\r?\n/)) {
-      if (linea.trim() && !linea.startsWith("#")) expect(linea, linea).toMatch(/^[A-Z_]+=$/);
+      if (linea.trim() && !linea.startsWith("#")) expect(linea, linea).toMatch(/^[A-Z0-9_]+=$/);
     }
     expect(archivosVersionados()).not.toContain(".env");
   });

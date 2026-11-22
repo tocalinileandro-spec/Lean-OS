@@ -1,4 +1,4 @@
-/** Service worker: abre la app sin conexión. Nunca toca /auth, /sync, /export ni /health (ver sw-logica.ts). */
+/** Service worker: abre la app sin conexión. Nunca toca /auth, /sync, /export, /ajustes ni /health (ver sw-logica.ts). */
 import { ARCHIVOS_APP, cachesObsoletas, decidir, nombreDeCache } from "./sw-logica.ts";
 
 declare const __VERSION__: string;

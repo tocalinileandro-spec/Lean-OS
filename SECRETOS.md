@@ -1,6 +1,6 @@
 # Secretos: cómo cargarlos
 
-Lean OS usa cuatro secretos (sección 7 de `docs/VISION.md`). Ninguno va al repositorio: se cargan una sola vez en los lugares de esta guía. `.env` ya está en `.gitignore` y `.env.example` tiene solo los nombres.
+Lean OS usa cuatro secretos (sección 7 de `docs/VISION.md`), más cuatro opcionales para el respaldo externo (sección 4 de esta guía). Ninguno va al repositorio: se cargan una sola vez en los lugares de esta guía. `.env` ya está en `.gitignore` y `.env.example` tiene solo los nombres.
 
 Los comandos de Windows son para `cmd`; en Linux y Mac son los mismos salvo donde se indica. No pegues los secretos en el chat, en commits ni en capturas.
 
@@ -92,3 +92,41 @@ Volvé a correr `node scripts/generar-secretos.ts` con la contraseña nueva y ca
 - Cambiar `SESSION_SECRET` (con otro valor generado por el script) cierra **todas** las sesiones abiertas en todos los dispositivos: hay que volver a entrar con la contraseña.
 - Cerrar sesión en la app invalida solo el token de ese dispositivo.
 - Los datos no se tocan en ningún caso: cada dispositivo conserva su copia local.
+
+## 4. Respaldo externo (opcional): Backblaze B2
+
+Es opcional y viene **desactivado**. Cada noche (03:00) el servidor ya guarda un respaldo local. Si lo activás, además sube una copia **cifrada** a tu bucket privado de Backblaze B2, y conserva las últimas 30. Sin activarlo en Ajustes, o sin las cuatro claves, no sale nada del servidor. La app funciona completa sin esto.
+
+Secretos opcionales: `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET` (nombre del bucket, no es secreto pero se carga igual) y `RESPALDO_CLAVE` (clave de cifrado). Todos van a Fly; `.env.example` tiene los nombres vacíos.
+
+1. Creá la cuenta en https://www.backblaze.com/sign-up/cloud-storage (plan gratuito de 10 GB; confirmá en la página que no te pide tarjeta o qué condiciones tiene).
+2. Creá un bucket **privado**: B2 Cloud Storage > Buckets > Create a Bucket. Nombre único (por ejemplo `lean-os-respaldo-tunombre`), Files in Bucket are: **Private**. Dejá el cifrado del lado de B2 y Object Lock apagados. Anotá el nombre.
+3. Creá una application key **limitada a ese bucket**: Application Keys > Add a New Application Key. Nombre `lean-os`, Allow access to Bucket(s): elegí **solo ese bucket**, Type of Access: **Read and Write**. Copiá `keyID` (será `B2_KEY_ID`) y `applicationKey` (será `B2_APP_KEY`): la clave se muestra **una sola vez**.
+4. Generá la clave de cifrado con el script (imprime una línea `RESPALDO_CLAVE=...`; la contraseña de la app se pide igual que en el paso 3 de arriba):
+   ```
+   node scripts/generar-secretos.ts --con-respaldo
+   ```
+   Tomá solo el valor de esa línea, lo que va después del signo igual (ya tenés los otros dos cargados; no hace falta volver a cargarlos).
+5. **ADVERTENCIA: guardá `RESPALDO_CLAVE` aparte, ahora**, en tu gestor de contraseñas o en un papel, fuera de Fly. Sin esa clave los respaldos de B2 **no se pueden abrir, nunca**, y nadie puede recuperarla. Si la perdés, tenés que generar otra y los respaldos viejos quedan inservibles.
+6. Cargalos en Fly (Linux/Mac/PowerShell; en Windows `cmd` poné cada `NOMBRE=valor` entre comillas dobles):
+   ```
+   fly secrets set --app lean-os B2_KEY_ID='<tu keyID>' B2_APP_KEY='<tu applicationKey>' B2_BUCKET='<nombre del bucket>' RESPALDO_CLAVE='<la clave del paso 4>'
+   ```
+   Comprobá los nombres: `fly secrets list --app lean-os`.
+7. Activalo en la app: Ajustes > "Respaldo externo (opcional)" > **Activar** (hace falta tener la sesión iniciada). El estado debe pasar de "falta configurar" a "activo". Para probarlo sin esperar a la noche: **Respaldar ahora**; debe aparecer el último resultado con la fecha, y el archivo `lean-os-AAAA-MM-DD.json.enc` en el bucket.
+8. Para desactivarlo: el mismo interruptor. No se borra nada del bucket.
+
+### Restaurar desde B2
+
+1. Entrá a B2 Cloud Storage > Buckets > tu bucket > Browse Files y descargá el `lean-os-AAAA-MM-DD.json.enc` que quieras.
+2. Con el servidor **vacío** (o con `--reemplazar`, que pisa los datos y antes guarda una copia), corré con la clave guardada. Linux/Mac:
+   ```
+   RESPALDO_CLAVE='<la clave guardada>' node scripts/restaurar.ts lean-os-AAAA-MM-DD.json.enc
+   ```
+   Windows `cmd`:
+   ```
+   set RESPALDO_CLAVE=<la clave guardada>
+   node scripts/restaurar.ts lean-os-AAAA-MM-DD.json.enc
+   set RESPALDO_CLAVE=
+   ```
+   Con una clave equivocada no restaura nada y lo avisa. En Fly, el script corre dentro de la máquina (`fly ssh console`, con el archivo subido a `/data`); la guía de restauración general es la misma que para los `.json`.

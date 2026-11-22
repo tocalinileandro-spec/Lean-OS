@@ -49,6 +49,8 @@ export interface ControlSync {
   cerrarSesion(): Promise<void>;
   sincronizarAhora(): Promise<void>;
   confirmarBorradoMasivo(): Promise<void>;
+  /** Pedido al servidor con el token de la sesión (lo usa Ajustes). Lanza ErrorSync si no hay sesión o no hay conexión. */
+  pedirConSesion?(ruta: string, init?: RequestInit): Promise<Response>;
 }
 
 export interface OpcionesMotor {
@@ -441,6 +443,10 @@ export class MotorSync implements ControlSync {
   }
 
   // ---------- red ----------
+
+  pedirConSesion(ruta: string, init: RequestInit = {}): Promise<Response> {
+    return this.#pedir(ruta, init);
+  }
 
   async #pedir(ruta: string, init: RequestInit = {}): Promise<Response> {
     const token = this.#token();

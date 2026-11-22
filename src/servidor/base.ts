@@ -60,6 +60,15 @@ export const MIGRACIONES: readonly Migracion[] = [
       `);
     },
   },
+  {
+    version: 3,
+    aplicar: `
+      CREATE TABLE ajustes_servidor (
+        clave TEXT PRIMARY KEY,
+        valor TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 export function versionActual(db: DatabaseSync): number {
