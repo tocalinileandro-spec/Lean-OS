@@ -23,6 +23,6 @@ Antes de empezar, leé `CLAUDE.md` y `docs/VISION.md`, y mirá `ESTADO.md` y `DE
 - No fusionás tu propio trabajo a `main`.
 - No cambiás, borrás ni relajás los criterios de la sección 4 ni las pruebas existentes para que pasen.
 - No agregás funciones, dependencias ni refactors que no estén en la visión o en la tarea.
-- No tocás `.github/workflows` (no tenés permiso): el CI se escribe en `ci/`.
+- Podés escribir `.github/workflows`. Si GitHub rechaza el push por eso, lo anotás en `BLOQUEOS.md`, dejás el archivo en `ci/` y seguís.
 - No escribís secretos en el repo, en registros ni en commits.
 - Si el mismo problema sigue después de 3 enfoques distintos, lo anotás en `BLOQUEOS.md` y se lo informás al Director en vez de seguir intentando.

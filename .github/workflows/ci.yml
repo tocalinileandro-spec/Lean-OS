@@ -1,4 +1,4 @@
-# Copiar a .github/workflows/ci.yml (el agente no tiene permiso Workflows).
+# CI de Lean OS. Fue movido desde ci/ a .github/workflows/ (ver DECISIONES.md).
 name: CI
 
 on:

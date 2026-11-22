@@ -7,8 +7,8 @@ import { IDS_EXIGIBLES } from "../fase-actual.ts";
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("B1 integración continua", () => {
-  it("B1: existe ci/ci.yml y corre `npm run verificar` (sin eso no hay despliegue)", () => {
-    const ruta = join(raiz, "ci", "ci.yml");
+  it("B1: existe .github/workflows/ci.yml y corre `npm run verificar` (sin eso no hay despliegue)", () => {
+    const ruta = join(raiz, ".github", "workflows", "ci.yml");
     expect(existsSync(ruta)).toBe(true);
     const texto = readFileSync(ruta, "utf8");
     expect(texto).toContain("npm ci");

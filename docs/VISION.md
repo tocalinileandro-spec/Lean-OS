@@ -24,13 +24,13 @@ Esta app existe para que lo que aprendés, lo que tenés que hacer y lo que se t
 **Lo que la app NO debe hacer nunca**
 
 - Borrar o sobrescribir datos sin dejar una copia recuperable.
-- Enviar tus datos a terceros (analítica, IA externa, publicidad).
+- Enviar tus datos a terceros (analítica, IA externa, publicidad). Excepción expresa: el respaldo externo y la entrada por audio (sección 8, opcionales) vienen desactivados y solo funcionan si el dueño los activa en Ajustes y carga su clave; la app funciona completa sin ellos.
 - Mostrar la respuesta de una tarjeta antes de que toques “Ver respuesta”.
 - Cambiar el formato JSON de importación sin una versión nueva y sin seguir aceptando el anterior.
 - Guardar contraseñas, claves o tokens en el código, el repositorio o los registros.
 - Agregar funciones fuera de los tres módulos sin que este documento lo diga.
 
-**Fuera de alcance por ahora:** entrada por audio, tareas recurrentes, imágenes adjuntas, varios usuarios y app nativa de celular.
+**Fuera de alcance por ahora:** imágenes adjuntas, varios usuarios y app nativa de celular. (Entrada por audio, tareas recurrentes, respaldo externo y gráficos de estadísticas entran como opcionales, sección 8.)
 
 ## 2. Módulos y funcionalidades
 
@@ -237,7 +237,7 @@ El proyecto necesita cuatro secretos, todos con el menor permiso posible, y se c
 | Secreto | Para qué sirve | Permisos mínimos | Dónde se carga |
 | --- | --- | --- | --- |
 | FLY\_API\_TOKEN | Desplegar en Fly.io desde GitHub Actions y desde la PC | Token de despliegue limitado a esta única app (`fly tokens create deploy`), sin acceso a otras apps ni a la cuenta | Secreto de GitHub Actions y archivo .env local |
-| GITHUB\_TOKEN | Que el agente suba código y lea los resultados de CI | Token de acceso fino limitado a este único repositorio privado: Contents lectura y escritura, Pull requests lectura y escritura, Actions lectura, Metadata lectura. Sin permiso Workflows: el agente no puede tocar .github/workflows, deja los archivos de CI en la carpeta ci/ y el dueño los copia una sola vez | Archivo .env local o login de `gh` |
+| GITHUB\_TOKEN | Que el agente suba código y lea los resultados de CI | Token de acceso fino limitado a este único repositorio privado: Contents lectura y escritura, Pull requests lectura y escritura, Actions lectura, Metadata lectura. El agente puede escribir .github/workflows; si GitHub rechaza el push de un workflow, deja el archivo en ci/ y lo anota en BLOQUEOS.md | Archivo .env local o login de `gh` |
 | APP\_PASSWORD\_HASH | Contraseña de la app (solo su hash) | No es una clave de un tercero: lo genera un script del repositorio a partir de la contraseña que elijas | Secreto de Fly.io |
 | SESSION\_SECRET | Firmar los tokens de sesión | Cadena aleatoria de 32 bytes que genera el script de arranque | Secreto de Fly.io |
 
@@ -255,7 +255,7 @@ El proyecto necesita cuatro secretos, todos con el menor permiso posible, y se c
 
 Cuatro fases esenciales en orden y una quinta opcional (la app de Windows). Cada una deja la app funcionando y termina cuando sus pruebas (sección 4) están verdes.
 
-1. **Base.** Leer el prototipo en Python (queda como referencia en la carpeta prototipo/, sin modificarlo), crear el repositorio, definir el esquema de datos, armar `npm run verificar`, la integración continua (escrita en la carpeta ci/, para que el dueño la copie a .github/workflows) y los archivos DECISIONES.md y ESTADO.md. Termina cuando: B1 corre.
+1. **Base.** Leer el prototipo en Python (queda como referencia en la carpeta prototipo/, sin modificarlo), crear el repositorio, definir el esquema de datos, armar `npm run verificar`, la integración continua (en .github/workflows/ci.yml) y los archivos DECISIONES.md y ESTADO.md. Termina cuando: B1 corre.
 2. **Tarjetas en local.** Importación, repaso con repetición espaciada, estadísticas mínimas, papelera y copia local. Termina cuando: I1 a I7, R1 a R9 y S1 en el navegador.
 3. **Tareas y apuntes.** Metas, tareas, pantalla Hoy y bandeja; apuntes con captura rápida, búsqueda y conversiones. Termina cuando: T1, T2, A1 y A2.
 4. **Servidor y sincronización.** Servidor en Node con TypeScript y SQLite, login, sincronización, respaldos, exportación, PWA instalable en el celular y despliegue en Fly.io. Termina cuando: S2 a S7, G1 a G5 y B3.
@@ -288,15 +288,15 @@ Tres agentes trabajan en ciclo y solo se detienen en los casos de la lista de ab
 
 **Protecciones que no dependen del agente**
 
-- La rama main está protegida en GitHub: solo se entra por pull request y con CI verde. Ni el agente ni nadie empuja directo.
-- verificar.ts (el script que corre `npm run verificar`), la carpeta .github/workflows y este documento figuran en CODEOWNERS a nombre del dueño: modificarlos exige su aprobación. El dueño activa esto una sola vez, al cerrar la fase 1, cuando verificar.ts ya existe.
+- A main solo se entra por pull request y con CI verde; nadie empuja directo. El Director abre y fusiona los pull requests cuando el CI está verde y el revisor aprobó. No hace falta CODEOWNERS, protección de rama ni OK del dueño.
 - verificar.ts falla si falta alguno de los IDs de la sección 4 o si alguno está salteado, así que borrar o debilitar una prueba rompe el CI.
 - El revisor mira el diff buscando pruebas eliminadas, relajadas o con tolerancias nuevas, y las rechaza.
 
 **Topes de costo e intentos**
 
 - Máximo 3 ciclos programador-revisor por tarea; al cuarto fallo se anota en BLOQUEOS.md y se pasa a otra tarea.
-- Máximo 10 tareas por sesión: el director la cierra y deja ESTADO.md al día.
+- Presupuesto de 20 horas de trabajo acumuladas entre todas las sesiones (reemplaza al tope de 10 tareas por sesión). El director anota en ESTADO.md la hora de inicio (comando `date`) y, al cerrar, suma lo trabajado al total. Al llegar a 20 h deja main estable con CI verde y termina.
+- Si el contexto del director se llena, cierra dejando en ESTADO.md el próximo paso exacto y una marca de hora de "sesión activa". Al empezar, si ESTADO.md muestra otra sesión activa con menos de 3 horas, o dice COMPLETO, termina sin hacer nada.
 - El consumo total lo limita el dueño desde su cuenta (el plan de suscripción o un límite de gasto en la API); los agentes no pueden subirlo. Las rutinas en la nube tienen además un tope diario de ejecuciones.
 - Nada de refactors ni mejoras que nadie pidió sobre lo que ya pasa sus pruebas.
 
@@ -304,7 +304,7 @@ Tres agentes trabajan en ciclo y solo se detienen en los casos de la lista de ab
 
 - Falta un secreto que no se puede simular y es lo único que impide avanzar. Dejan todo lo demás hecho.
 - Una acción irreversible sobre datos reales: borrar o reemplazar el volumen de producción, o restaurar un respaldo encima de datos vivos.
-- Algo implicaría un costo nuevo, como un plan de pago de Fly.io o un servicio externo, o se llegó a un tope de la lista de topes de costo e intentos.
+- Algo implicaría un costo nuevo, como un plan de pago de Fly.io o un servicio externo, o se llegó al tope de 20 horas de la lista de topes de costo e intentos.
 - Este documento se contradice o pide algo imposible.
 - El mismo bloqueo sigue después de 3 enfoques distintos: lo anotan en BLOQUEOS.md y siguen con otra tarea; solo se detienen si no queda ninguna.
 
