@@ -10,11 +10,22 @@
 import { app, BrowserWindow, dialog, Menu, session, shell } from "electron";
 import { appendFileSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { resolverCarpetaDatos } from "../src/escritorio/datos.ts";
 import { codigoEscribir, codigoLeer } from "../src/escritorio/prueba-s1.ts";
 import { iniciarServidorLocal, resolverPuerto, resolverServidorRemoto, type ServidorLocal } from "../src/escritorio/servidor-local.ts";
 
 const env = process.env;
-const carpetaDatos = env["LEAN_OS_DATOS"] ? env["LEAN_OS_DATOS"] : join(app.getPath("appData"), "Lean OS");
+let carpetaDatos: string;
+try {
+  carpetaDatos = resolverCarpetaDatos(env, () => join(app.getPath("appData"), "Lean OS"));
+} catch (e) {
+  // Antes de crear o tocar cualquier carpeta.
+  const mensaje = e instanceof Error ? e.message : String(e);
+  console.error(mensaje);
+  dialog.showErrorBox("Lean OS", mensaje);
+  app.exit(1);
+  throw e;
+}
 mkdirSync(carpetaDatos, { recursive: true });
 app.setPath("userData", carpetaDatos);
 
@@ -101,11 +112,19 @@ async function arrancar(): Promise<void> {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
-  win.webContents.on("will-navigate", (e, url) => {
-    if (new URL(url).origin === origen) return;
+  const controlarNavegacion = (e: { preventDefault(): void }, url: string) => {
+    let permitido = false;
+    try {
+      permitido = new URL(url).origin === origen;
+    } catch {
+      permitido = false; // dirección inválida: se bloquea
+    }
+    if (permitido) return;
     e.preventDefault();
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
-  });
+  };
+  win.webContents.on("will-navigate", controlarNavegacion);
+  win.webContents.on("will-redirect", controlarNavegacion);
   if (modoPrueba) {
     win.webContents.once("did-finish-load", () => {
       pruebaEnPagina(win).then(() => terminar(0), (e: unknown) => fallar(e instanceof Error ? e.message : String(e)));

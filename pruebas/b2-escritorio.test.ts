@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { IDS_EXIGIBLES } from "../fase-actual.ts";
 import { AlmacenIndexedDB } from "../src/cliente/almacen-indexeddb.ts";
+import { resolverCarpetaDatos } from "../src/escritorio/datos.ts";
 import { ID_TARJETA_PRUEBA, PREGUNTA_PRUEBA, codigoEscribir, codigoLeer } from "../src/escritorio/prueba-s1.ts";
 import {
   PUERTO_POR_DEFECTO, SERVIDOR_POR_DEFECTO, iniciarServidorLocal, resolverPuerto, resolverServidorRemoto, urlRemotaValida,
@@ -146,6 +147,17 @@ describe("B2: servidor local de la app de Windows", () => {
     expect(resolverServidorRemoto({}, "no es json")).toMatchObject({ url: SERVIDOR_POR_DEFECTO, aviso: expect.any(String) });
     expect(urlRemotaValida("file:///etc/passwd")).toBeNull();
     expect(urlRemotaValida("javascript:alert(1)")).toBeNull();
+  });
+
+  it("B2: con LEAN_OS_PRUEBA y sin LEAN_OS_DATOS falla antes de elegir carpeta (no toca los datos reales)", () => {
+    let usada = false;
+    const normal = () => { usada = true; return "C:/real"; };
+    expect(() => resolverCarpetaDatos({ LEAN_OS_PRUEBA: "s1-escribir" }, normal)).toThrow(/falta LEAN_OS_DATOS/);
+    expect(() => resolverCarpetaDatos({ LEAN_OS_PRUEBA: "salud", LEAN_OS_DATOS: "" }, normal)).toThrow(/LEAN_OS_DATOS/);
+    expect(usada).toBe(false);
+    expect(resolverCarpetaDatos({ LEAN_OS_PRUEBA: "salud", LEAN_OS_DATOS: "/tmp/x" }, normal)).toBe("/tmp/x");
+    expect(resolverCarpetaDatos({}, normal)).toBe("C:/real");
+    expect(resolverCarpetaDatos({ LEAN_OS_DATOS: "/otra" }, normal)).toBe("/otra");
   });
 
   it("B2: el workflow tiene el job exe-windows que compila el .exe en windows-latest, lo arranca en modo salud y sube el artefacto", () => {

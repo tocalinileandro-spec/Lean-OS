@@ -191,3 +191,8 @@ Formato: fecha, qué se eligió, por qué.
 - **CI:** job `exe-windows` (windows-latest, `contents: read`, shell bash, en pull_request y push a main): checkout, Node 22, `npm ci`, `npm run build`, `compilar.ts`, `npm ci` y `npm run empaquetar` en `escritorio/`, `probar-exe.ts` y `upload-artifact@v4` (`Lean-OS-exe`, 30 días). `desplegar` sigue dependiendo solo de `verificar`.
 - **Pruebas / exigibles:** `pruebas/b2-escritorio.test.ts` (B2: health, estáticos, proxy feliz, 502 sin red/sin servidor/timeout, 404, puerto ocupado, configuración, workflow; S1: el código de página sobre IndexedDB falso y que el job ejecuta escribir y luego leer). `IDS_EXIGIBLES` suma B2 (solo se amplía); S1 ya lo era.
 - **Probado localmente:** Electron 45 instalado solo en `escritorio/node_modules` (ignorado por git) y corrido en Linux con xvfb y `--no-sandbox`: los tres modos de prueba dieron `SALUD_OK`, `S1_ESCRITO`, `S1_LEIDO` con código 0, y `s1-leer` sobre datos vacíos falla con código 1. **No probado:** empaquetado con electron-builder, ejecución del .exe en Windows, ícono, portable, comportamiento de SmartScreen.
+
+## 2026-11-22 (F5-a, ciclo 2)
+
+- **Modos de prueba y datos reales:** si `LEAN_OS_PRUEBA` está definida y falta `LEAN_OS_DATOS` (o está vacía), la app falla con un mensaje en castellano antes de crear o tocar ninguna carpeta (sin escribir tarjetas ni borrar `resultado-prueba.txt`) y sale con código 1. La decisión es la función pura `resolverCarpetaDatos` (`src/escritorio/datos.ts`), con prueba B2 en vitest.
+- **Navegación:** `will-redirect` se trata igual que `will-navigate`; si `new URL(url)` falla, la dirección se bloquea. `probar-exe.ts` y el criterio del código de salida no se tocaron (se ajustan tras ver el CI real).
