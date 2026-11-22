@@ -1,33 +1,51 @@
 # Estado
 
+**COMPLETO** (2026-11-22). Todo el alcance pedido está terminado y fusionado en `main` con CI verde. Lo único que falta lo hacés vos: cargar los secretos y desplegar (ver "Qué tenés que hacer vos").
+
 ## Control de sesión (presupuesto de 20 h)
 
-- **Sesión activa:** desde 2026-11-22 21:54:43 UTC (marca de actividad: 2026-11-22 21:54:43 UTC). Si otra sesión ve esto con menos de 3 h de antigüedad, no hace nada.
-- **Horas acumuladas de sesiones anteriores:** 0 h. Total consumido al cerrar cada sesión = anterior + (hora de cierre − hora de inicio).
-- **Estado de `main`:** fases 1 y 2 fusionadas (PR #1).
-- **Próximo paso exacto:** reglas nuevas (PR `tarea/meta-reglas`), luego fase 3.
+- **Sesión activa:** ninguna. Cerrada el 2026-11-22 23:49 UTC.
+- **Horas trabajadas en esta sesión:** inicio 2026-11-22 21:54:43 UTC, cierre 23:49 UTC, unas 1,9 h.
+- **Total acumulado:** 1,9 h de 20 h.
+- Si otra sesión lee esto: dice COMPLETO, no hay nada que hacer.
 
-- **Fase actual:** fases 1 y 2 CERRADAS (2026-11-22). Próxima: fase 3 (Tareas y apuntes).
-- **Cierre de fase 2:** `npm run verificar` APROBADO con B1, I1-I7, R1-R9 y S1 en verde; revisión aprobada en cada tarea (F2-b y F2-c en el ciclo 2, F2-d en el ciclo 3; ningún tope superado). Fusionado a `main` (PR #1).
-- **Hecho:** prototipo movido a `prototipo/`; package.json, tsconfig estricto, vitest; esquema de datos (tipos); reloj real y simulado; `npm run verificar` con REPORTE.md; CI en `.github/workflows/ci.yml`; DECISIONES.md y BLOQUEOS.md.
-- **F2-a hecha:** almacén (interfaz + memoria), normalización, parseo/validación, importar, deshacer, `diaLogico`. Exigibles hoy: B1, I1-I7 (ver `fase-actual.ts`). El resto figura como pendiente en REPORTE.md.
-- **F2-b hecha:** `repaso.ts` (calificar, guardar, deshacer, cola del día, sesión). Exigibles suman R1-R8. R9 (UI) y S1 siguen pendientes.
-- **F2-c hecha:** `AlmacenIndexedDB` (`src/cliente/`), `guardarLote` transaccional, papelera/gestión (`gestion.ts`), estadísticas mínimas, S1 (navegador, simulado con fake-indexeddb). Exigibles suman S1. **S1 se revalida con tareas en la fase 3.**
-- **F2-d hecha:** interfaz web del módulo 1 (`src/cliente/ui/`, `main.ts`, `index.html`, `estilos.css`), `npm run build` con esbuild, R9 exigible. Con esto la fase 2 tiene R9 y S1 en navegador; verificada a mano con Playwright (importar el ejemplo, repasar, recargar).
-- **Correr la app local:** `npm run build` y abrir `dist/index.html` en el navegador (los datos quedan en IndexedDB del navegador). Pantallas: Hoy, Repaso, Tarjetas (importar, papelera, editar/mover/suspender/borrar), Ajustes (nuevas por día, hora de cambio).
-- **Falta de la UI:** exportar/importar respaldo, estado de sync, cerrar sesión y PWA (fase 4). F3-b hecha (rama `tarea/F3-b`): Tareas, Metas, Apuntes, Hoy completa y papelera con los 4 tipos.
-- **Próximo:** fase 3: metas, tareas, Hoy completa y apuntes (T1, T2, A1, A2; revalidar S1 con tareas).
-- **F3-a hecha (rama `tarea/F3-a`):** lógica de metas, tareas y apuntes sin UI (`tareas.ts`, `apuntes.ts`), almacén con metas/tareas, purga ampliada, S1 revalidado con tareas. Exigibles suman T1, T2, A1, A2. Falta F3-b: UI de Tareas y Apuntes y papelera con tareas/metas/apuntes.
-- **Para tu revisión:** hay vulnerabilidades reportadas por `npm install` en dependencias de desarrollo (sin `npm audit fix` hecho); la purga de papelera es solo local (decidir en fase 4 cómo se propaga); migraciones de IndexedDB con respaldo previo faltan cuando exista un esquema v2.
-- **Despliegue / secretos:** pendientes hasta la fase 4.
+## Qué quedó hecho (todo en `main`)
 
-- **F4-b hecha (rama `tarea/F4-b`):** sync del servidor (push idempotente con conflictos por grupo, pull paginado, borrado masivo S6), export, restauración (`npm run restaurar`), respaldo nocturno con retención de 30 y planificador. Exigibles suman S3, S4, S5, S6, G4. Falta F4-c: cliente de sync (S2, S7, estado de sync, exportar/importar en Ajustes), PWA y despliegue.
+- **Fases 1 y 2:** base TypeScript, esquema, reloj simulado, `npm run verificar`, importación de tarjetas, repaso espaciado, papelera, copia local en IndexedDB y la interfaz del módulo 1.
+- **Fase 3:** metas anual y trimestral, tareas, Hoy completa con tarea rápida, bandeja, apuntes con captura rápida, búsqueda y conversiones, y papelera con los cuatro tipos.
+- **Fase 4:** servidor Node + Hono + SQLite (`node:sqlite`), login con argon2id, sesiones de 30 días, límite de intentos, redirección a HTTPS, sincronización (push/pull idempotente, conflictos por grupo, rechazo de borrado masivo), exportación, restauración, respaldo nocturno con retención de 30, cliente de sincronización, cuenta y respaldo manual en Ajustes, PWA instalable, Dockerfile, `fly.toml` y el despliegue preparado en el CI.
+- **Fase 5:** app de Windows (`Lean-OS.exe`, Electron portable) que el CI compila en un runner de Windows, arranca y prueba (B2 y S1 dentro del .exe); queda como artefacto del CI por 30 días.
+- **Opcionales (criterios O1-O24 agregados antes a la sección 4 y claves a la sección 7):** respaldo externo cifrado a Backblaze B2 (O1-O6), entrada por audio con Groq (O7-O12), tareas recurrentes (O13-O19) y gráficos de estadísticas (O20-O24). El respaldo externo y el audio vienen desactivados y la app funciona completa sin ellos.
+- **Pruebas:** en un clon limpio de `main`, `npm run tipos`, `npm run build` y `npm run verificar` pasan (277 pruebas); todos los IDs de la sección 4 (I, R, T, A, S, G, B1-B3 y O1-O24) en verde. El CI de `main` (verificar, exe-windows y desplegar, que se saltea sin token) está verde. `npm audit --omit=dev`: 0 vulnerabilidades.
+- **Guías:** `SECRETOS.md` (pasos exactos para cada secreto), `PROBAR.md` (correr en Windows con `cmd`), `README.md`.
 
-- **F4-c hecha (rama `tarea/F4-c`):** cliente de sync (`src/cliente/sync/`), login/logout, indicador de estado, "Sincronizar ahora", confirmación de borrado masivo, Exportar/Importar respaldo (formato compartido en `src/compartido/respaldo-formato.ts`). Exigibles suman S2 y S7. Falta de la fase 4: PWA instalable, despliegue en Fly.io (B3) y G5 (escaneo de secretos), si no están hechos.
+## Qué tenés que hacer vos
 
-- **F4-d hecha (rama `tarea/F4-d`):** PWA instalable (manifest, íconos, service worker con versión por build que nunca toca /auth, /sync, /export ni /health), servidor que sirve `dist/`, `Dockerfile` (validado con docker real) y `.dockerignore`, `fly.toml`, job de despliegue en `ci.yml`, `SECRETOS.md`, `PROBAR.md`. Exigibles suman G5 y B3. Se arregló un bug: el servidor no arrancaba con Node plano por "parameter properties" (ver DECISIONES.md).
-- **Pendiente (requiere al dueño):** B3 real. Cargar FLY_API_TOKEN, APP_PASSWORD_HASH y SESSION_SECRET (SECRETOS.md), crear app y volumen en Fly, y confirmar en el primer despliegue que `https://lean-os.fly.dev/health` responde "ok", que el nombre `lean-os` no esté tomado y que el volumen retiene 60 días de snapshots. Mientras no esté el token el CI saltea el despliegue con un aviso. La instalación como PWA y el uso sin conexión se probaron por lógica y por build, no en un navegador real.
+1. Seguí `SECRETOS.md` de arriba abajo: crear la app y el volumen en Fly, cargar `FLY_API_TOKEN` en GitHub (Settings > Secrets > Actions) y `APP_PASSWORD_HASH` + `SESSION_SECRET` en Fly. Con eso, el próximo push a `main` despliega solo y consulta `/health`.
+2. **B3 (despliegue real) sigue pendiente de ese token:** hasta que lo cargues, el paso de despliegue del CI se saltea con un aviso. La prueba B3 del repo verifica solo la configuración; que `https://<app>.fly.dev/health` responda "ok" se confirma recién después del primer despliegue.
+3. Opcionales (cuando quieras): `SECRETOS.md` secciones 4 (Backblaze B2 + `RESPALDO_CLAVE`, guardá esa clave aparte) y 5 (Groq), y activarlos en Ajustes.
 
-- **F5-a hecha (rama `tarea/F5-a`):** app de Windows con Electron en `escritorio/` (paquete aparte), servidor local con proxy en `src/escritorio/servidor-local.ts`, modos de prueba por variable de entorno, `escritorio/probar-exe.ts` y job `exe-windows` en `ci.yml`. `B2` exigible. Verificado aquí: pruebas de vitest (B2, S1 estático), compilación del proceso principal y los tres modos de prueba corriendo Electron en Linux con xvfb.
-- **Pendiente (requiere CI de Windows):** confirmar que `electron-builder` arma `Lean-OS.exe` en `windows-latest`, que el .exe pasa salud, s1-escribir y s1-leer, y el ícono (PNG 512). No se probó empaquetado ni ejecución real en Windows.
-- **Dudoso / pendiente del dueño:** el .exe no está firmado (firmar cuesta dinero); la SmartScreen de Windows puede avisar al abrirlo (ver PROBAR.md sección 8).
+## Lo dudoso o sin poder probar (para tu revisión)
+
+- **Claves de snapshot de Fly** (`scheduled_snapshots`, `snapshot_retention = 60` en `fly.toml`): escritas de memoria, sin acceso a la documentación. Si Fly las rechaza, el primer despliegue falla de forma visible (sin perder datos): corregí o quitá esas dos líneas. `SECRETOS.md` explica cómo verificar la retención real con `fly volumes show`.
+- **Nombre `lean-os` en Fly:** puede estar tomado; si lo está, cambialo en `fly.toml` y en el job de despliegue (los pasos están en `SECRETOS.md`).
+- **`DestinoB2` y `ProveedorGroq`:** escritos de memoria contra las APIs de Backblaze B2 y Groq, sin probarlos contra los servicios reales (aquí no hay claves ni acceso). Están aislados en `src/servidor/destino-b2.ts` y `src/servidor/audio.ts`; las pruebas usan servicios simulados. Probalos a mano al activarlos: "Respaldar ahora" en Ajustes y grabar un audio corto. Que Backblaze permita abrir la cuenta gratis sin tarjeta tampoco lo pude confirmar. La cuota gratuita de Groq tiene tope diario.
+- **Navegador real:** la instalación como PWA, el uso sin conexión con el service worker y la grabación con micrófono se probaron solo con simuladores y la lógica; no en Chrome/Edge reales.
+- **`.exe` sin firmar:** Windows SmartScreen puede avisar al abrirlo (firmarlo cuesta dinero; no se hizo). Funciona; en CI se compiló y se probó en Windows real.
+- **Servidor restaurado con un `rev` mayor que el del cliente:** el cliente no lo detecta por sí solo (no pierde nada; resube lo que edite). Con un `rev` menor sí sube todo.
+- **Registro de conflictos (`registro_sync`):** se guarda siempre al perdedor, así que puede acumular filas repetidas si un cliente reenvía una versión vieja de un grupo; no pierde ni duplica datos.
+- **Purga de papelera:** corre al abrir la app y como mucho una vez por día lógico (solo elimina lo borrado hace 30 días o más; los repasos nunca se purgan) y es solo local: el servidor conserva lo borrado. Si en una resincronización completa vuelve un registro ya purgado, llega como borrado y se vuelve a purgar al día siguiente.
+- **Borrado sin sincronizar por 30 días:** si un borrado hecho sin conexión lleva 30 días o más sin subirse, la purga local lo elimina sin que el servidor lo haya recibido y un pull posterior podría traerlo de vuelta como vivo. Es muy raro y no pierde datos (el registro sigue vivo en el servidor).
+- **Retención en Backblaze B2:** `DestinoB2.borrar` elimina solo la versión más reciente de cada nombre; si el bucket guarda versiones ocultas (por ejemplo, por subir dos veces el mismo día), pueden quedar versiones viejas ocupando espacio y la retención de 30 no sería exacta. Conviene configurar en el bucket una regla de ciclo de vida que borre versiones viejas.
+- **Tareas recurrentes:** la siguiente ocurrencia nace al marcar hecha la actual; si se borra la única ocurrencia pendiente de una serie, la serie no genera más hasta restaurarla. Los tipos de regla son diaria, semanal y mensual (anual y "cada N días" no se hicieron).
+- **Varias pestañas:** el candado entre sincronización y ediciones protege dentro de una pestaña; entre dos pestañas abiertas del mismo navegador no hay exclusión.
+- **Una sola máquina en Fly** (SQLite no se comparte): la máquina queda siempre encendida para que el respaldo de las 03:00 corra; ver costo en tu panel de Fly.
+- **`node:sqlite`:** Node lo marca experimental y imprime un aviso al arrancar; funciona en Node 22 (el Dockerfile usa esa versión).
+- **Acción de CI `setup-flyctl@master`:** Fly solo documenta `@master` para esa acción; no está fijada a una versión.
+- **Dependencias de desarrollo:** `npm install` informa vulnerabilidades en paquetes de desarrollo (sin `npm audit fix`); no entran en la imagen de producción.
+- **Migraciones de IndexedDB:** todavía no existe un esquema v2 del cliente, así que el respaldo previo a una migración de IndexedDB no hizo falta; el servidor sí respalda antes de migrar.
+
+## Registro técnico
+
+- Decisiones: `DECISIONES.md` (fecha, qué se eligió y por qué). Bloqueos: ninguno (`BLOQUEOS.md`). Ningún tope de 3 ciclos programador-revisor se superó (el máximo fue el ciclo 2).
+- Pull requests fusionados en esta etapa: #2 al #13 (el #1 ya estaba fusionado al empezar).
