@@ -200,3 +200,9 @@ Formato: fecha, qué se eligió, por qué.
 ## 2026-11-22 (F5-a, ajuste tras el CI real de Windows)
 
 - El job `exe-windows` pasó en CI real (SALUD_OK, S1_ESCRITO, S1_LEIDO) sin el aviso de código distinto: el portable propaga el código de salida. `probar-exe.ts` ahora exige, además de la marca y `CODIGO=0` en `resultado-prueba.txt`, que el código de salida real del .exe sea 0 (si no, falla). Se mantiene el archivo como fuente de la marca porque stdout no siempre está enlazado. Esto reemplaza lo dicho antes sobre "solo avisar" si el código difiere.
+
+## 2026-11-22 (opcional 1: respaldo externo, criterios)
+
+- **Destino elegido: Backblaze B2** (plan gratuito de 10 GB, sin tarjeta que yo sepa; el dueño debe confirmarlo al crear la cuenta). Alternativas descartadas: Google Drive (flujo OAuth con renovación de tokens, más piezas y más permisos), GitHub privado (mezcla datos personales con el código y tiene topes por archivo), Cloudflare R2 (pide medio de pago). B2 se usa por su API nativa (3 llamadas con `fetch`, sin dependencias) y una application key limitada a un único bucket.
+- **Cifrado antes de subir** (AES-256-GCM con clave `RESPALDO_CLAVE`): lo que sale a un tercero es ilegible para él. Costo: sin la clave el respaldo externo no se abre; por eso la guía obliga a guardar la clave aparte.
+- **Criterios O1-O6 agregados a la sección 4 y claves a la sección 7** de docs/VISION.md antes de construirlo (instrucción del dueño). Se corrigió el prefijo O en la lista de prefijos.
