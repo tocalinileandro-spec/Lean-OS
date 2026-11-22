@@ -242,3 +242,9 @@ Formato: fecha, qué se eligió, por qué.
 - `build.ts` acepta la variable `LEAN_OS_DIST` (carpeta de salida; por defecto `dist`, así `npm run build` no cambia). La prueba PWA y la O12 del bundle compilan cada una en su propia carpeta temporal, por lo que ninguna depende de un build previo ni se pisan entre sí ni con `dist/`.
 - Se agregó a O10 una prueba de subida chunked sin Content-Length (flujo de 200 MB): responde 413, el flujo se corta cerca del tope (no se consume entero) y no se llama al proveedor.
 
+
+## 2026-11-22 (opcional 3: tareas recurrentes, criterios)
+
+- **Criterios O13-O19 agregados a la sección 4 y una viñeta "Repetición" al módulo 2 de la sección 2** de docs/VISION.md antes de construirlo (instrucción del dueño). No lleva clave ni servicio externo.
+- **Reglas de diseño decididas:** la siguiente ocurrencia se crea al marcar hecha (no por un planificador), con fecha = primera que cumple la regla estrictamente posterior a max(fecha de la tarea, hoy lógico); id determinista derivado de (serie, fecha) para que dos dispositivos produzcan el mismo registro y la sincronización no duplique; sin repeticiones "atrasadas acumuladas". Tres tipos de regla: diaria, semanal (días de la semana) y mensual (día del mes, con tope en el último día). Alternativas descartadas por ahora: anual y "cada N días" (se pueden sumar luego como reglas nuevas sin cambiar el esquema).
+- **Compatibilidad:** los campos nuevos de la tarea son opcionales; los datos y respaldos anteriores siguen válidos (O19).

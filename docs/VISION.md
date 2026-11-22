@@ -78,6 +78,7 @@ Reglas del cálculo: reps suma 1 con Difícil, Bien y Fácil. El intervalo se re
 - **Bandeja.** Las tareas sin fecha.
 - **Metas.** La anual tiene año y título. La trimestral tiene año, trimestre (T1 a T4) y título, y puede colgar de una anual. Estados: activa, lograda o descartada. El progreso (tareas hechas sobre tareas vinculadas) es solo informativo.
 - **Borrar.** Va a la papelera. Borrar una meta no borra sus tareas: quedan sin meta.
+- **Repetición (opcional, sección 8).** Una tarea puede repetirse todos los días, ciertos días de la semana o un día del mes (si el mes no lo tiene, el último día). Al marcarla hecha se crea la siguiente ocurrencia, con fecha posterior a hoy y posterior a la propia (una atrasada no genera las intermedias). La siguiente tiene un id determinista de la serie y la fecha, así que marcar dos veces o en dos dispositivos no la duplica. “Dejar de repetir” corta la serie; borrar una ocurrencia solo borra esa.
 
 ### Módulo 3: Apuntes e ideas
 
@@ -132,7 +133,7 @@ Ante cualquier duda, la app elige lo que no pierde datos y no pregunta; la únic
 
 Una función está terminada solo cuando su prueba pasa sola, sin intervención humana. Un único comando (`npm run verificar`) corre todas las pruebas con reloj simulado y datos de ejemplo, y escribe REPORTE.md con el resultado de cada ID. Para poder simular el tiempo, el código recibe el reloj como dependencia.
 
-Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio O7-O12, tareas recurrentes y gráficos; cada grupo se agrega antes de construirlo).
+Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio O7-O12, tareas recurrentes O13-O19 y gráficos; cada grupo se agrega antes de construirlo).
 
 | ID | Qué hace la prueba | Resultado esperado |
 | --- | --- | --- |
@@ -183,6 +184,13 @@ Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G se
 | O10 | Mandar audio y revisar disco, base de datos y registros; mandar uno de más de 10 MB y uno de un tipo no permitido | El audio no se guarda en ningún lado y el servidor lo descarta tras la respuesta; los excesos reciben 413 y 415 con mensaje en castellano |
 | O11 | El proveedor falla, no responde o devuelve cuota agotada | Mensaje en castellano, lo escrito en la caja no se pierde y la app y la sincronización siguen normales |
 | O12 | Activar y desactivar el audio desde Ajustes; revisar respuestas, registros y el código del cliente | Exige sesión (401 sin ella), el estado se guarda en el servidor y la clave del proveedor no aparece en respuestas, registros ni en el cliente |
+| O13 | Tarea diaria con fecha de hoy y marcarla hecha | Queda hecha y existe una tarea nueva, pendiente, con fecha de mañana, mismo título, nota, meta y regla |
+| O14 | Tarea semanal (lunes y jueves) marcada hecha un lunes y otra un jueves | La del lunes genera la del jueves; la del jueves genera la del lunes siguiente |
+| O15 | Tarea mensual del día 31 marcada hecha en enero, febrero (año común y bisiesto) y abril | La siguiente cae el último día del mes cuando el mes no tiene día 31 (28/29 de febrero, 30 de abril) y el 31 en los meses que sí |
+| O16 | Tarea diaria atrasada 3 días marcada hecha hoy | Genera una sola tarea, con fecha posterior a hoy; no genera las ocurrencias intermedias |
+| O17 | Marcar, desmarcar y volver a marcar la misma tarea recurrente, y marcarla en dos dispositivos sin conexión que luego sincronizan | Existe una sola ocurrencia siguiente (id determinista), sin duplicados |
+| O18 | Crear una tarea con repetición desde el formulario, editar la regla, “dejar de repetir” y borrar una ocurrencia | La regla se guarda; al dejar de repetir ya no se generan más; borrar una ocurrencia solo borra esa (a la papelera); Hoy y Bandeja muestran la ocurrencia vigente |
+| O19 | Tareas y respaldos creados antes de esta función (sin campos de repetición), sincronizarlos y exportar/importar una tarea con regla | Siguen siendo válidos y se comportan como antes (T1 y T2 intactos); el servidor acepta tareas con y sin regla; la regla se conserva en el export y la importación |
 
 ## 5. Arquitectura y tecnologías
 
