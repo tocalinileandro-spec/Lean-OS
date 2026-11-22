@@ -1,0 +1,232 @@
+/**
+ * Lógica de pantalla del módulo 1: sin DOM, para poder probarla. Las vistas (vistas.ts)
+ * solo dibujan lo que estas funciones devuelven.
+ */
+import type { Almacen } from "../../compartido/almacen.ts";
+import { fijarHoraCambio, diaLogico } from "../../compartido/dia.ts";
+import {
+  CALIFICACIONES, HORA_CAMBIO_DE_DIA, NUEVAS_POR_DIA,
+  type Area, type Calificacion, type FechaISO, type Id, type Tarjeta,
+} from "../../compartido/esquema.ts";
+import { calcularEstadisticas, type Estadisticas } from "../../compartido/estadisticas.ts";
+import { normalizar } from "../../compartido/normalizar.ts";
+import { calificar, construirCola, SesionRepaso } from "../../compartido/repaso.ts";
+import type { Reloj } from "../../compartido/reloj.ts";
+
+export interface Dependencias {
+  almacen: Almacen;
+  reloj: Reloj;
+  persistencia: Persistencia;
+}
+
+/** Lo mínimo que se usa de localStorage (se inyecta otra cosa en las pruebas). */
+export interface Persistencia {
+  getItem(clave: string): string | null;
+  setItem(clave: string, valor: string): void;
+}
+
+// ---------- Formato ----------
+
+/** AAAA-MM-DD -> dd/mm/aaaa. */
+export function formatearFecha(iso: FechaISO): string {
+  const [a, m, d] = iso.split("-");
+  return `${d}/${m}/${a}`;
+}
+
+export function textoIntervalo(dias: number): string {
+  if (dias <= 0) return "Hoy";
+  if (dias === 1) return "1 día";
+  return `${dias} días`;
+}
+
+/** Nunca se muestra un error técnico crudo: mensaje en castellano que dice qué hacer. */
+export function mensajeDeError(error: unknown): string {
+  const t = error instanceof Error ? error.message : "";
+  if (/no puede quedar vacía/.test(t)) return t.replace(/^Error:\s*/, "") + ". Completalo y volvé a guardar.";
+  return "No se pudo completar la acción. Probá de nuevo; si sigue fallando, recargá la página (tus datos están guardados).";
+}
+
+export const ETIQUETAS: Record<Calificacion, string> = { otra_vez: "Otra vez", dificil: "Difícil", bien: "Bien", facil: "Fácil" };
+
+// ---------- Ajustes ----------
+
+export interface Ajustes {
+  nuevasPorDia: number;
+  horaCambio: string;
+}
+
+export const AJUSTES_POR_DEFECTO: Ajustes = { nuevasPorDia: NUEVAS_POR_DIA, horaCambio: HORA_CAMBIO_DE_DIA };
+const CLAVE_AJUSTES = "lean-os:ajustes";
+
+export function cargarAjustes(p: Persistencia): Ajustes {
+  try {
+    const crudo = JSON.parse(p.getItem(CLAVE_AJUSTES) ?? "null") as Partial<Ajustes> | null;
+    const r = validarAjustes({ ...AJUSTES_POR_DEFECTO, ...(crudo ?? {}) });
+    return "ajustes" in r ? r.ajustes : AJUSTES_POR_DEFECTO;
+  } catch {
+    return AJUSTES_POR_DEFECTO;
+  }
+}
+
+export function validarAjustes(a: { nuevasPorDia: unknown; horaCambio: unknown }): { ajustes: Ajustes } | { error: string } {
+  const n = typeof a.nuevasPorDia === "number" ? a.nuevasPorDia : String(a.nuevasPorDia).trim() === "" ? NaN : Number(a.nuevasPorDia);
+  if (!Number.isInteger(n) || n < 0 || n > 999) return { error: "Las tarjetas nuevas por día tienen que ser un número entero entre 0 y 999." };
+  const h = /^(\d{1,2}):(\d{2})$/.exec(String(a.horaCambio));
+  if (!h || Number(h[1]) > 23 || Number(h[2]) > 59) return { error: "La hora de cambio de día tiene que ser una hora válida, por ejemplo 04:00." };
+  return { ajustes: { nuevasPorDia: n, horaCambio: `${h[1]!.padStart(2, "0")}:${h[2]}` } };
+}
+
+/** Guarda al instante y aplica la hora de cambio. */
+export function guardarAjustes(p: Persistencia, a: Ajustes): void {
+  p.setItem(CLAVE_AJUSTES, JSON.stringify(a));
+  fijarHoraCambio(a.horaCambio);
+}
+
+// ---------- Áreas ----------
+
+export function nombreDeArea(area: Area, areas: Area[]): string {
+  const padre = area.padre_id ? areas.find((x) => x.id === area.padre_id) : undefined;
+  return padre ? `${padre.nombre} > ${area.nombre}` : area.nombre;
+}
+
+// ---------- Hoy ----------
+
+export interface VistaHoy {
+  fecha: string;
+  pendientes: number;
+  estadisticas: Estadisticas;
+}
+
+export async function vistaHoy(d: Dependencias): Promise<VistaHoy> {
+  const aj = cargarAjustes(d.persistencia);
+  return {
+    fecha: formatearFecha(diaLogico(d.reloj)),
+    pendientes: (await construirCola(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia })).length,
+    estadisticas: await calcularEstadisticas(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia }),
+  };
+}
+
+// ---------- Repaso ----------
+
+export interface BotonRepaso {
+  boton: Calificacion;
+  etiqueta: string;
+  intervalo: string;
+  atajo: number;
+}
+
+export interface VistaRepaso {
+  hayTarjeta: boolean;
+  pendientes: number;
+  calificadas: number;
+  puedeDeshacer: boolean;
+  area?: string;
+  pregunta?: string;
+  /** Solo existe si hay pista; el texto va a la vista únicamente cuando se la pidió. */
+  hayPista?: boolean;
+  pista?: string;
+  respuestaVisible?: boolean;
+  /** Solo se completa después de "Ver respuesta" (R9). */
+  respuesta?: string;
+  botones?: BotonRepaso[];
+}
+
+export class PantallaRepaso {
+  /** Tarjeta para la que se pidió la respuesta / la pista: solo vale para esa tarjeta (R9). */
+  #idRespuesta: Id | undefined;
+  #idPista: Id | undefined;
+  #calificadas = 0;
+
+  private constructor(private d: Dependencias, private sesion: SesionRepaso) {}
+
+  static async iniciar(d: Dependencias): Promise<PantallaRepaso> {
+    const aj = cargarAjustes(d.persistencia);
+    const cola = await construirCola(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia });
+    return new PantallaRepaso(d, new SesionRepaso(d.almacen, d.reloj, cola));
+  }
+
+  /** Sin tarjeta actual (por ejemplo, la borraron desde otra pestaña) no hace nada. */
+  async verRespuesta(): Promise<void> {
+    this.#idRespuesta = await this.sesion.siguiente();
+  }
+  async verPista(): Promise<void> {
+    this.#idPista = await this.sesion.siguiente();
+  }
+
+  async vista(): Promise<VistaRepaso> {
+    const id = await this.sesion.siguiente();
+    const base = { pendientes: this.sesion.pendientes, calificadas: this.#calificadas, puedeDeshacer: this.#calificadas > 0 };
+    if (id === undefined) return { hayTarjeta: false, ...base };
+    const t = (await this.d.almacen.tarjetas.obtener(id))!;
+    const respuestaVisible = this.#idRespuesta === id;
+    const pistaVisible = this.#idPista === id;
+    const areas = await this.d.almacen.areas.listar();
+    const area = areas.find((a) => a.id === t.area_id);
+    const v: VistaRepaso = {
+      hayTarjeta: true, ...base,
+      area: area ? nombreDeArea(area, areas) : "",
+      pregunta: t.pregunta,
+      hayPista: !!t.pista,
+      respuestaVisible,
+    };
+    if (t.pista && pistaVisible) v.pista = t.pista;
+    if (respuestaVisible) {
+      v.respuesta = t.respuesta;
+      const hoy = diaLogico(this.d.reloj);
+      v.botones = CALIFICACIONES.map((b, i) => ({
+        boton: b, etiqueta: ETIQUETAS[b], atajo: i + 1,
+        intervalo: textoIntervalo(calificar(t, b, hoy).intervalo),
+      }));
+    }
+    return v;
+  }
+
+  /** Solo califica si ya se vio la respuesta. */
+  async calificar(boton: Calificacion): Promise<void> {
+    const id = await this.sesion.siguiente();
+    if (id === undefined || this.#idRespuesta !== id) return;
+    await this.sesion.calificar(boton);
+    this.#calificadas++;
+    this.#idRespuesta = undefined;
+    this.#idPista = undefined;
+  }
+
+  async deshacer(): Promise<void> {
+    if (await this.sesion.deshacer()) {
+      this.#calificadas = Math.max(0, this.#calificadas - 1);
+      this.#idRespuesta = undefined;
+      this.#idPista = undefined;
+    }
+  }
+}
+
+// ---------- Tarjetas (lista por Área > Subárea) ----------
+
+export interface GrupoTarjetas {
+  area: Area;
+  nombre: string;
+  tarjetas: Tarjeta[];
+}
+
+/** Grupos ordenados: cada Área seguida de sus Subáreas. Se omiten los grupos sin tarjetas. */
+export async function agruparTarjetas(almacen: Almacen, busqueda: string): Promise<GrupoTarjetas[]> {
+  const areas = await almacen.areas.listar();
+  const tarjetas = await almacen.tarjetas.listar();
+  const q = normalizar(busqueda);
+  const coincide = (t: Tarjeta) => !q || normalizar(`${t.pregunta} ${t.respuesta} ${t.pista ?? ""}`).includes(q);
+  const porNombre = (a: Area, b: Area) => a.nombre.localeCompare(b.nombre, "es");
+  const orden: Area[] = [];
+  for (const raiz of areas.filter((a) => a.padre_id === null).sort(porNombre)) {
+    orden.push(raiz, ...areas.filter((a) => a.padre_id === raiz.id).sort(porNombre));
+  }
+  // Subáreas cuyo padre falta (no debería pasar): se muestran igual.
+  for (const a of areas) if (!orden.includes(a)) orden.push(a);
+  return orden
+    .map((area) => ({ area, nombre: nombreDeArea(area, areas), tarjetas: tarjetas.filter((t) => t.area_id === area.id && coincide(t)) }))
+    .filter((g) => g.tarjetas.length > 0);
+}
+
+export async function opcionesDeArea(almacen: Almacen): Promise<{ id: Id; nombre: string }[]> {
+  const areas = await almacen.areas.listar();
+  return areas.map((a) => ({ id: a.id, nombre: nombreDeArea(a, areas) })).sort((x, y) => x.nombre.localeCompare(y.nombre, "es"));
+}

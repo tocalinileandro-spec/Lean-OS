@@ -1,18 +1,25 @@
-# Entorno de Python y archivos que se generan solos
-.venv/
-__pycache__/
-*.pyc
-
-# Versión descargable: se arma con construir_exe.bat, no se sube
-build/
+# Node
+node_modules/
 dist/
-*.spec
-_guardado_temporal/
+coverage/
+*.tsbuildinfo
 
-# Tus datos NO van al repositorio (viven en tu carpeta de datos, por ejemplo en la nube)
+# Secretos: nunca al repositorio (existe .env.example con los nombres vacíos)
+.env
+.env.*
+!.env.example
+
+# Se regenera con cada `npm run verificar`
+REPORTE.md
+.verificar-vitest.json
+
+# Tus datos NO van al repositorio
 datos/
 papelera/
 respaldos/
 
-# Tu configuración personal (tiene tu ruta). Se sube configuracion.ejemplo.json en su lugar.
+# Entorno de Python del prototipo
+.venv/
+__pycache__/
+*.pyc
 configuracion.json
