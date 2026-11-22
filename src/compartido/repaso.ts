@@ -134,11 +134,14 @@ export async function construirCola(almacen: Almacen, reloj: Reloj, opciones: Op
     .filter((t) => !esNueva(t) && t.vence <= hoy)
     .sort((a, b) => (a.vence < b.vence ? -1 : a.vence > b.vence ? 1 : 0));
   const cupo = Math.max(0, limite - nuevasHoy);
+  // Calificación a medias (corte entre guardar el repaso y la tarjeta): estado de nueva pero con repaso vigente.
+  // La tarjeta en curso vuelve a la cola como pendiente de hoy, sin gastar cupo.
+  const interrumpidas = tarjetas.filter((t) => esNueva(t) && primero.has(t.id));
   const nuevas = tarjetas
     .filter((t) => esNueva(t) && !primero.has(t.id))
     .sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
     .slice(0, cupo);
-  return [...vencidas, ...nuevas];
+  return [...vencidas, ...interrumpidas, ...nuevas];
 }
 
 /** Sesión de repaso: cola en memoria; "Otra vez" reencola al final. Cada calificación se guarda al instante. */
@@ -153,8 +156,18 @@ export class SesionRepaso {
   get pendientes(): number { return this.#cola.length; }
   get actualId(): Id | undefined { return this.#cola[0]; }
 
+  /** Descarta del frente las tarjetas borradas o suspendidas durante la sesión y devuelve la actual. */
+  async siguiente(): Promise<Id | undefined> {
+    while (this.#cola.length > 0) {
+      const t = await this.almacen.tarjetas.obtener(this.#cola[0]!);
+      if (t && t.deleted_at === null && !t.suspendida) return t.id;
+      this.#cola.shift();
+    }
+    return undefined;
+  }
+
   async calificar(boton: Calificacion): Promise<ResultadoCalificacion> {
-    const id = this.#cola[0];
+    const id = await this.siguiente();
     if (id === undefined) throw new Error("La cola está vacía");
     const colaAntes = [...this.#cola];
     const res = await calificarYGuardar(this.almacen, this.reloj, id, boton);

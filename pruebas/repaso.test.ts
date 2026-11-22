@@ -116,4 +116,28 @@ describe("repaso", () => {
     r.avanzarMinutos(1); // 04:00
     expect(diaLogico(r)).toBe("2026-11-23");
   });
+
+  it("R4 (corte): si se corta entre guardar el repaso y la tarjeta, la tarjeta nueva sigue en la cola", async () => {
+    const { a, r, id } = await nuevo();
+    const guardar = a.tarjetas.guardar.bind(a.tarjetas);
+    a.tarjetas.guardar = async () => { throw new Error("corte"); };
+    await expect(calificarYGuardar(a, r, id, "bien")).rejects.toThrow("corte");
+    a.tarjetas.guardar = guardar;
+    expect((await a.repasos.listarPorTarjeta(id))).toHaveLength(1);
+    expect((await construirCola(a, r)).map((t) => t.id)).toEqual([id]);
+  });
+
+  it("sesión: saltea tarjetas borradas o suspendidas durante la sesión", async () => {
+    const a = new AlmacenMemoria();
+    const r = new RelojSimulado(INICIO);
+    const [t1, t2, t3] = [tarjeta(), tarjeta(), tarjeta()] as [Tarjeta, Tarjeta, Tarjeta];
+    await a.tarjetas.guardarVarios([t1, t2, t3]);
+    const s = new SesionRepaso(a, r, await construirCola(a, r));
+    await a.tarjetas.guardar({ ...t1, deleted_at: "2026-11-22T15:00:00.000Z" });
+    await a.tarjetas.guardar({ ...t2, suspendida: true });
+    expect(await s.siguiente()).toBe(t3.id);
+    const { tarjeta: t } = await s.calificar("bien");
+    expect(t.id).toBe(t3.id);
+    expect(s.pendientes).toBe(0);
+  });
 });

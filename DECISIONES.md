@@ -41,3 +41,4 @@ Formato: fecha, qué se eligió, por qué.
 - **Nueva:** intervalo 0, reps 0, lapses 0 y sin repasos vigentes. Una tarjeta calificada "Otra vez" ya no es nueva (lapses 1): entra como vencida (vence hoy).
 - **Límite de nuevas:** 20 por defecto (`NUEVAS_POR_DIA`), parámetro `limiteNuevas`. Las nuevas ya repasadas hoy (primer repaso vigente en el día lógico actual) descuentan del límite, así reabrir la app no da otras 20. Nuevas en orden de creación.
 - **Cola:** vencidas = vence <= hoy, más atrasadas primero (empate: orden de inserción). Excluye suspendidas y borradas.
+- **Sesión y tarjetas borradas/suspendidas:** `SesionRepaso.siguiente()` descarta del frente las que se borraron o suspendieron durante la sesión; `calificar` lo usa, así no se traba.
