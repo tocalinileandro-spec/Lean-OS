@@ -77,6 +77,59 @@ describe("interfaz de tareas, metas y apuntes", () => {
     expect((await ui.almacen.tareas.listar())[0]!.estado).toBe("pendiente");
   });
 
+  it("doble Enter seguido en la tarea rápida crea una sola tarea", async () => {
+    const { ui } = await nuevo();
+    await ui.escribir("#tarea-rapida", "Tarea única");
+    await Promise.all([ui.teclaEn(ui.q("#tarea-rapida"), "Enter"), ui.teclaEn(ui.q("#tarea-rapida"), "Enter")]);
+    expect(await ui.almacen.tareas.listar()).toHaveLength(1);
+  });
+
+  it("los formularios abiertos conservan lo escrito cuando otra acción redibuja, y se limpian al cancelar o guardar", async () => {
+    const { ui, reloj } = await nuevo();
+    await crearTarea(ui.almacen, reloj, { titulo: "Otra tarea" });
+    await ui.ir("tareas");
+    await ui.clic("Nueva tarea");
+    await ui.escribir("#tarea-titulo", "Borrador");
+    await ui.escribir("#tarea-nota", "nota a medias");
+    ui.q<HTMLElement>('input[aria-label^="Marcar como hecha: Otra"]').click(); // otra acción redibuja
+    await ui.app.esperar();
+    expect(ui.q<HTMLInputElement>("#tarea-titulo").value).toBe("Borrador");
+    expect(ui.q<HTMLTextAreaElement>("#tarea-nota").value).toBe("nota a medias");
+    await ui.clic("Nueva tarea"); // cierra
+    await ui.clic("Nueva tarea"); // abre de nuevo: vacío
+    expect(ui.q<HTMLInputElement>("#tarea-titulo").value).toBe("");
+    await ui.escribir("#tarea-titulo", "Guardada");
+    await ui.clic("Guardar tarea");
+    await ui.clic("Nueva tarea");
+    expect(ui.q<HTMLInputElement>("#tarea-titulo").value).toBe("");
+    await ui.clic("Cancelar");
+
+    await ui.clic("Nueva meta anual");
+    await ui.escribir("#meta-titulo", "Meta a medias");
+    ui.q<HTMLElement>('input[aria-label^="Desmarcar: Otra"]').click();
+    await ui.app.esperar();
+    expect(ui.q<HTMLInputElement>("#meta-titulo").value).toBe("Meta a medias");
+    await ui.clic("Cancelar");
+
+    await ui.ir("apuntes");
+    await ui.clic("Nuevo apunte");
+    await ui.escribir("#captura-texto", "Primer apunte");
+    await ui.clic("Guardar apunte");
+    await ui.clic("Editar");
+    await ui.escribir("#apunte-texto", "Texto editado a medias");
+    await ui.escribir("#busqueda-apuntes", "");
+    expect(ui.q<HTMLTextAreaElement>("#apunte-texto").value).toBe("Texto editado a medias");
+    await ui.clic("Cancelar");
+    expect(ui.q("#apunte-texto")).toBeNull();
+    await ui.clic("Editar");
+    expect(ui.q<HTMLTextAreaElement>("#apunte-texto").value).toBe("Primer apunte"); // cancelar limpió lo escrito
+    await ui.clic("Cancelar");
+    await ui.clic("Pasar a tarjeta");
+    await ui.escribir("#tarjeta-pregunta", "Pregunta a medias");
+    await ui.escribir("#busqueda-apuntes", "");
+    expect(ui.q<HTMLTextAreaElement>("#tarjeta-pregunta").value).toBe("Pregunta a medias");
+  });
+
   it("Hoy destaca las atrasadas arriba y muestra el acceso 'Repasar N tarjetas'", async () => {
     const { ui, reloj } = await nuevo();
     await crearTarea(ui.almacen, reloj, { titulo: "Pagar la luz", fecha: "2026-11-20" });

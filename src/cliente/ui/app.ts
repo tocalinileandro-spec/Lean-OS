@@ -79,15 +79,30 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   let apunteEnEdicion: Id | null = null;
   let borradorTarjeta: { apunteId: Id; b: BorradorTarjeta } | null = null;
   const filtros = { texto: "", tipo: "", etiqueta: "", area: "" };
-  /** Lo escrito en un formulario cuando falló el guardado: se conserva para no perder lo tipeado. */
+  const firmaForm = () => [tareaEnForm, formMeta, apunteEnEdicion, borradorTarjeta?.apunteId].join("|");
+  /** Lo escrito en los formularios abiertos: sobrevive a los redibujados y se limpia al guardar, cancelar o cambiar de formulario. */
   const recuerdo = new Map<string, string>();
   const previo = (id: string, defecto: string) => recuerdo.get(id) ?? defecto;
   const recordar = (...els: (HTMLElement | null)[]) => { for (const e of els) if (e) recuerdo.set(e.id, (e as HTMLInputElement).value); };
+  /** Hace que cada campo con id del formulario guarde su valor en `recuerdo` mientras se escribe. */
+  function recordando(form: HTMLElement): HTMLElement {
+    for (const e of form.querySelectorAll<HTMLElement>("input[id], textarea[id], select[id]")) {
+      const guardar = () => recordar(e);
+      e.addEventListener("input", guardar);
+      e.addEventListener("change", guardar);
+    }
+    return form;
+  }
   let cola: Promise<void> = Promise.resolve();
 
   /** Serializa las acciones: una a la vez, y siempre se redibuja al final. */
   function accion(f: () => Promise<void> | void): void {
-    cola = cola.then(async () => { aviso = ""; errorAjustes = ""; await f(); recuerdo.clear(); }).catch((e) => { aviso = mensajeDeError(e); }).then(dibujar);
+    cola = cola.then(async () => {
+      aviso = ""; errorAjustes = "";
+      const antes = firmaForm();
+      await f();
+      if (firmaForm() !== antes) recuerdo.clear(); // se cerró o cambió el formulario: lo escrito ya no vale
+    }).catch((e) => { aviso = mensajeDeError(e); }).then(dibujar);
   }
 
   function ir(p: Pantalla): void {
@@ -141,8 +156,10 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
         const ke = ev as KeyboardEvent;
         if (ke.key !== "Enter" || ke.isComposing) return;
         ke.preventDefault();
-        const titulo = (ke.target as HTMLInputElement).value;
+        const campo = ke.target as HTMLInputElement;
+        const titulo = campo.value;
         if (!titulo.trim()) return;
+        campo.value = ""; // un segundo Enter seguido ya no encuentra nada para crear
         accion(async () => { await crearTareaRapida(d.almacen, d.reloj, titulo); });
       },
     });
@@ -244,6 +261,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
             boton("Editar", () => accion(() => { tareaEnForm = t.id; }), "suave chico"),
             boton("Borrar", () => accion(async () => {
               await borrarTarea(d.almacen, d.reloj, t.id);
+              if (tareaEnForm === t.id) tareaEnForm = null;
               aviso = "Tarea enviada a la papelera. Podés restaurarla desde “Ver papelera” en Tarjetas.";
             }), "peligro chico"),
           ],
@@ -282,11 +300,11 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       tareaEnForm = null;
       aviso = t ? "Cambios guardados." : "Tarea guardada.";
     });
-    return h("li", { class: "edicion" },
+    return recordando(h("li", { class: "edicion" },
       h("label", {}, "Título", titulo), h("label", {}, "Fecha (opcional)", fecha), metaLabel, h("label", {}, "Nota (opcional)", nota),
       h("div", { class: "acciones" },
         boton("Guardar tarea", guardar, "principal chico"),
-        boton("Cancelar", () => accion(() => { tareaEnForm = null; }), "suave chico")));
+        boton("Cancelar", () => accion(() => { tareaEnForm = null; }), "suave chico"))));
   }
 
   function formularioMeta(tipo: "anual" | "trimestral", anuales: MetaConProgreso[]): Node {
@@ -296,7 +314,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const trimestre = select("meta-trimestre", "Trimestre", [1, 2, 3, 4].map((n) => ({ id: String(n), nombre: `T${n}` })), previo("meta-trimestre", String(Math.ceil(Number(hoy.slice(5, 7)) / 3))));
     const padre = select("meta-padre", "Cuelga de la meta anual (opcional)", anuales.map((m) => ({ id: m.meta.id, nombre: m.etiqueta })), previo("meta-padre", ""), "Ninguna");
     const valor = (l: HTMLElement) => (l.querySelector("select") as HTMLSelectElement).value;
-    return h("div", { class: "edicion" },
+    return recordando(h("div", { class: "edicion" },
       h("label", {}, "Año", anio), h("label", {}, "Título", titulo),
       tipo === "trimestral" && trimestre, tipo === "trimestral" && padre,
       h("div", { class: "acciones" },
@@ -308,7 +326,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
           formMeta = null;
           aviso = "Meta guardada.";
         }), "principal chico"),
-        boton("Cancelar", () => accion(() => { formMeta = null; }), "suave chico")));
+        boton("Cancelar", () => accion(() => { formMeta = null; }), "suave chico"))));
   }
 
   function filaMeta(m: MetaConProgreso): Node {
@@ -400,6 +418,8 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
         boton("Pasar a tarjeta", () => accion(async () => { borradorTarjeta = { apunteId: a.id, b: await convertirApunteATarjeta(d.almacen, a.id) }; }), "suave chico"),
         boton("Borrar", () => accion(async () => {
           await borrarApunte(d.almacen, d.reloj, a.id);
+          if (apunteEnEdicion === a.id) apunteEnEdicion = null;
+          if (borradorTarjeta?.apunteId === a.id) borradorTarjeta = null;
           aviso = "Apunte enviado a la papelera. Podés restaurarlo desde “Ver papelera” en Tarjetas.";
         }), "peligro chico")));
   }
@@ -413,7 +433,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const tipo = select("apunte-tipo", "Tipo", TIPOS_APUNTE.map((t) => ({ id: t, nombre: TIPOS_NOMBRE[t] })), previo("apunte-tipo", a.tipo));
     const area = select("apunte-area", "Área (opcional)", areas, previo("apunte-area", a.area_id ?? ""), "Sin área");
     const valor = (l: HTMLElement) => (l.querySelector("select") as HTMLSelectElement).value;
-    return h("li", { class: "edicion" },
+    return recordando(h("li", { class: "edicion" },
       h("label", {}, "Título (opcional)", titulo), h("label", {}, "Texto", texto), h("label", {}, "Etiquetas", etiquetas), tipo, area,
       h("div", { class: "acciones" },
         boton("Guardar apunte", () => accion(async () => {
@@ -424,7 +444,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
           apunteEnEdicion = null;
           aviso = "Cambios guardados.";
         }), "principal chico"),
-        boton("Cancelar", () => accion(() => { apunteEnEdicion = null; }), "suave chico")));
+        boton("Cancelar", () => accion(() => { apunteEnEdicion = null; }), "suave chico"))));
   }
 
   /** Formulario de tarjeta con el texto del apunte precargado; guardar crea la tarjeta. */
@@ -434,7 +454,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const pista = h("input", { type: "text", id: "tarjeta-pista", "aria-label": "Pista", value: previo("tarjeta-pista", b.pista ?? "") }) as HTMLInputElement;
     const area = select("tarjeta-area", "Área", areas, previo("tarjeta-area", b.area_id ?? ""), "Elegí un área");
     const nueva = h("input", { type: "text", id: "tarjeta-area-nueva", "aria-label": "Área nueva", value: previo("tarjeta-area-nueva", ""), placeholder: "Por ejemplo: Programación > CS50" }) as HTMLInputElement;
-    return h("div", { class: "edicion" },
+    return recordando(h("div", { class: "edicion" },
       h("h2", {}, "Nueva tarjeta desde el apunte"),
       h("label", {}, "Pregunta", pregunta), h("label", {}, "Respuesta", respuesta), h("label", {}, "Pista (opcional)", pista), area,
       h("label", {}, "O escribí un área nueva (opcional)", nueva),
@@ -448,7 +468,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
           borradorTarjeta = null;
           aviso = "Tarjeta creada. La vas a ver en el repaso.";
         }), "principal chico"),
-        boton("Cancelar", () => accion(() => { borradorTarjeta = null; }), "suave chico")));
+        boton("Cancelar", () => accion(() => { borradorTarjeta = null; }), "suave chico"))));
   }
 
   // ---------- Tarjetas ----------
