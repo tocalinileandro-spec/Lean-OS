@@ -12,10 +12,11 @@ import {
 } from "../../compartido/apuntes.ts";
 import {
   borrarMeta, borrarTarea, cambiarEstadoMeta, crearMetaAnual, crearMetaTrimestral, crearTarea, crearTareaRapida, desmarcarHecha,
-  editarTarea, marcarHecha,
+  detenerRepeticion, editarTarea, marcarHecha,
 } from "../../compartido/tareas.ts";
 import { diaLogico } from "../../compartido/dia.ts";
 import type { ControlSync } from "../sync/motor.ts";
+import { describirRepeticion, reglaValida, type Repeticion } from "../../compartido/recurrencia.ts";
 import { TIPOS_APUNTE, type Apunte, type Calificacion, type EstadoMeta, type Id, type Tarea, type Tarjeta, type TipoApunte, type Trimestre } from "../../compartido/esquema.ts";
 import {
   agruparTarjetas, cargarAjustes, formatearFecha, guardarAjustes, mensajeDeError, nombreDeArea, opcionesDeArea,
@@ -277,6 +278,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
         h("span", { class: "texto" }, t.titulo),
         (o.fecha || t.fecha) && h("span", { class: "suave" }, ` · ${t.fecha ? formatearFecha(t.fecha) : "sin fecha"}`),
         o.meta && h("span", { class: "suave" }, ` · ${o.meta}`)),
+      reglaValida(t.repeticion) && h("p", { class: "suave repeticion" }, `↻ ${describirRepeticion(t.repeticion)}`),
       t.nota && h("p", { class: "suave nota" }, t.nota),
       o.acciones && h("div", { class: "acciones" }, ...o.acciones));
   }
@@ -365,22 +367,63 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const fecha = h("input", { type: "date", id: "tarea-fecha", "aria-label": "Fecha", value: previo("tarea-fecha", t?.fecha ?? "") }) as HTMLInputElement;
     const nota = h("textarea", { id: "tarea-nota", rows: 2, "aria-label": "Nota" }, previo("tarea-nota", t?.nota ?? "")) as HTMLTextAreaElement;
     const metaLabel = select("tarea-meta", "Meta", opcionesMeta, previo("tarea-meta", t?.meta_id ?? ""), "Sin meta");
+    const rep = reglaValida(t?.repeticion);
+    const tipoRep = h("select", { id: "tarea-repetir", "aria-label": "Repetir" },
+      h("option", { value: "no" }, "No"), h("option", { value: "diaria" }, "Todos los días"),
+      h("option", { value: "semanal" }, "Ciertos días de la semana"), h("option", { value: "mensual" }, "Un día del mes")) as HTMLSelectElement;
+    tipoRep.value = previo("tarea-repetir", rep?.tipo ?? "no");
+    const NOMBRES_DIAS = ["L", "M", "X", "J", "V", "S", "D"];
+    const casillas = NOMBRES_DIAS.map((n, i) => {
+      const c = h("input", { type: "checkbox", id: `tarea-repetir-dia-${i + 1}`, "aria-label": ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"][i]! }) as HTMLInputElement;
+      c.checked = previo(c.id, rep?.tipo === "semanal" && rep.dias.includes(i + 1) ? "1" : "") === "1";
+      return h("label", { class: "tilde" }, c, n);
+    });
+    const diaMes = h("input", {
+      type: "number", id: "tarea-repetir-dia-mes", "aria-label": "Día del mes", min: 1, max: 31,
+      value: previo("tarea-repetir-dia-mes", rep?.tipo === "mensual" ? String(rep.dia_mes) : ""),
+    }) as HTMLInputElement;
+    const reglaDelForm = (): Repeticion | null => {
+      if (tipoRep.value === "diaria") return { tipo: "diaria" };
+      if (tipoRep.value === "semanal") {
+        return { tipo: "semanal", dias: casillas.map((l, i) => (l.querySelector("input")!.checked ? i + 1 : 0)).filter((n) => n > 0) };
+      }
+      if (tipoRep.value === "mensual") return { tipo: "mensual", dia_mes: Number(diaMes.value) };
+      return null;
+    };
     const guardar = () => accion(async () => {
       recordar(titulo, fecha, nota, metaLabel.querySelector("select"));
       const datos = {
         titulo: titulo.value, fecha: fecha.value || null,
         meta_id: (metaLabel.querySelector("select") as HTMLSelectElement).value || null, nota: nota.value.trim() || null,
+        repeticion: reglaDelForm(),
       };
       if (t) await editarTarea(d.almacen, d.reloj, t.id, datos);
       else await crearTarea(d.almacen, d.reloj, datos);
       tareaEnForm = null;
       aviso = t ? "Cambios guardados." : "Tarea guardada.";
     });
-    return recordando(h("li", { class: "edicion" },
+    const detalleRep = h("div", { class: "repeticion-detalle" },
+      tipoRep.value === "semanal" ? h("div", { role: "group", "aria-label": "Días de la semana" }, ...casillas) : null,
+      tipoRep.value === "mensual" ? h("label", {}, "Día del mes (1 a 31)", diaMes) : null);
+    const form = recordando(h("li", { class: "edicion" },
       h("label", {}, "Título", titulo), h("label", {}, "Fecha (opcional)", fecha), metaLabel, h("label", {}, "Nota (opcional)", nota),
+      h("label", {}, "Repetir", tipoRep), detalleRep,
       h("div", { class: "acciones" },
         boton("Guardar tarea", guardar, "principal chico"),
+        rep && t ? boton("Dejar de repetir", () => accion(async () => {
+          await detenerRepeticion(d.almacen, d.reloj, t.id);
+          tareaEnForm = null;
+          aviso = "Listo: la tarea ya no se repite.";
+        }), "suave chico") : null,
         boton("Cancelar", () => accion(() => { tareaEnForm = null; }), "suave chico"))));
+    // Las casillas guardan "1" o "" (no el value fijo de la casilla); se registran después de recordando.
+    for (const l of casillas) {
+      const c = l.querySelector("input")!;
+      c.addEventListener("change", () => recuerdo.set(c.id, c.checked ? "1" : ""));
+    }
+    // Al cambiar el tipo se redibuja para mostrar los campos que corresponden.
+    tipoRep.addEventListener("change", () => accion(() => { recordar(tipoRep); }));
+    return form;
   }
 
   function formularioMeta(tipo: "anual" | "trimestral", anuales: MetaConProgreso[]): Node {
