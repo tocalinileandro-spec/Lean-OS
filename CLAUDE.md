@@ -1,0 +1,36 @@
+# Lean OS: instrucciones para los agentes
+
+Lean OS es la app personal de estudio y organización de Leandro: tarjetas con repetición espaciada, tareas y metas, y apuntes e ideas. Funciona sin conexión y se sincroniza con un servidor chico.
+
+## Antes de cada tarea
+
+1. Leé `docs/VISION.md`. Es la fuente de verdad: qué se construye, reglas de decisión, pruebas, secretos, plan por fases y roles.
+2. Leé `ESTADO.md` (en qué fase estamos), `DECISIONES.md` y `BLOQUEOS.md`, si existen.
+3. Si algo no está en `docs/VISION.md`, no se construye.
+
+## Cómo se trabaja
+
+- La sesión principal es el **Director** (sección 9 de la visión). Elige la próxima tarea del plan, la delega y fusiona lo aprobado.
+- Los otros dos roles son subagentes definidos en `.claude/agents/`: `programador` y `revisor`. El Director los llama; ellos no llaman a otros agentes.
+- Ciclo: Director describe la tarea con los IDs de prueba → `programador` implementa y corre `npm run verificar` → `revisor` verifica → si pasa, el Director fusiona; si falla, vuelve al programador con la lista de fallas.
+- Una tarea chica por vez, en una rama corta (`tarea/<id>`), y entra a `main` solo por pull request con CI verde. Nadie empuja directo a `main`.
+- Nada está terminado hasta que `npm run verificar` pase. No se cambian, borran ni relajan los criterios de la sección 4 para que pasen.
+- No se pide OK entre fases: el Director pasa a la siguiente apenas las pruebas de la fase están verdes.
+
+## Reglas fijas
+
+- **Lenguaje:** todo en TypeScript, cliente y servidor.
+- **Prototipo:** los archivos en Python de la raíz (`servidor.py`, `LeanOS.spec`, los `.bat`, etc.) son el prototipo viejo. En la fase 1 se mueven a `prototipo/` sin modificarlos y se usan solo como referencia de comportamiento.
+- **Secretos:** nunca en el repo, en registros ni en commits. Usá `.env.example` con los nombres vacíos. El agente no tiene permiso Workflows: los archivos de CI se escriben en `ci/` y el dueño los copia a `.github/workflows`.
+- **Memoria entre sesiones:** cada sesión arranca sin recuerdos, así que todo lo importante va a archivos. `ESTADO.md` se actualiza al cerrar cada tarea y cada fase; las decisiones van a `DECISIONES.md` (fecha, qué se eligió, por qué); los bloqueos a `BLOQUEOS.md`.
+- **Idioma:** la interfaz va en español rioplatense. Los commits y los archivos de estado, en español.
+
+## Topes
+
+- Máximo 3 ciclos programador-revisor por tarea. Al cuarto fallo: anotar en `BLOQUEOS.md` y pasar a otra tarea.
+- Máximo 10 tareas por sesión. Al llegar, el Director deja `ESTADO.md` al día y cierra.
+- Nada de refactors ni mejoras que no estén pedidas sobre lo que ya pasa sus pruebas.
+
+## Cuándo parar y avisar
+
+Solo en los casos de la lista "Cuándo se detienen y te piden algo" de la sección 9 de `docs/VISION.md`. Al parar, el mensaje dice qué falta, qué ya está hecho y cuál es la opción por defecto. En cualquier otro caso se decide con la sección 3, se anota en `DECISIONES.md` y se sigue.
