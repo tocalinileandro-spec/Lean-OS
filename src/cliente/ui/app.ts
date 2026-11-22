@@ -85,6 +85,16 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   interface EstadoExterno { activo: boolean; configurado: boolean; ultimo_resultado: { cuando: string; ok: boolean; mensaje: string } | null }
   let externo: EstadoExterno | null = null;
   let errorExterno = "";
+  /** Entrada por audio (opcional): último estado conocido del servidor, en memoria. null = nunca consultado. */
+  interface EstadoAudio { activo: boolean; configurado: boolean }
+  let audioEstado: EstadoAudio | null = null;
+  let audioSinConexion = false;
+  let errorAudioAjustes = "";
+  let capturaConsultada = false;
+  type FaseGrabacion = "" | "pidiendo" | "grabando" | "transcribiendo";
+  let faseAudio: FaseGrabacion = "";
+  let mensajeAudio = "";
+  let grabadora: { detener(descartar: boolean): void } | null = null;
   let versionVista = 0;
   let apunteEnEdicion: Id | null = null;
   let borradorTarjeta: { apunteId: Id; b: BorradorTarjeta } | null = null;
@@ -121,6 +131,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   }
 
   function ir(p: Pantalla): void {
+    if (p !== "apuntes") grabadora?.detener(true);
     accion(async () => {
       pantalla = p;
       aviso = "";
@@ -183,6 +194,8 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const idActivo = activo && activo !== doc.body ? activo.id : "";
     const contenido: Hijo[] = [];
     if (aviso) contenido.push(h("p", { class: "aviso", role: "status" }, aviso));
+    if (!capturaAbierta || pantalla !== "apuntes") capturaConsultada = false;
+    else if (!capturaConsultada) { capturaConsultada = true; await cargarAudio(); }
     try {
       if (pantalla === "hoy") contenido.push(await dibujarHoy());
       else if (pantalla === "repaso") contenido.push(await dibujarRepaso());
@@ -191,6 +204,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       else if (pantalla === "tarjetas") contenido.push(await dibujarTarjetas());
       else {
         await cargarExterno();
+        await cargarAudio();
         contenido.push(dibujarAjustes());
       }
     } catch (e) {
@@ -460,7 +474,163 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     return h("div", { class: "captura" }, caja,
       h("div", { class: "acciones" },
         boton("Guardar apunte", guardar, "principal"),
-        boton("Cancelar", () => accion(() => { capturaAbierta = false; }), "suave")));
+        ...botonesAudio(),
+        boton("Cancelar", () => accion(() => { grabadora?.detener(true); capturaAbierta = false; }), "suave")),
+      textoEstadoAudio());
+  }
+
+  // ---------- entrada por audio (opcional, O7-O12) ----------
+  const TOPE_GRABACION_MS = 120_000;
+  const TOPE_AUDIO_BYTES = 10 * 1024 * 1024;
+
+  /** Consulta si el audio está activo y configurado (solo con sesión). Sin conexión o error: se conserva el último estado conocido. */
+  async function cargarAudio(): Promise<void> {
+    const s = d.sync;
+    errorAudioAjustes = "";
+    if (!s || !s.pedirConSesion || !s.hayCuenta()) return;
+    try {
+      const r = await s.pedirConSesion("/ajustes/audio");
+      if (!r.ok) throw new Error("estado");
+      audioEstado = (await r.json()) as EstadoAudio;
+      audioSinConexion = false;
+    } catch (e) {
+      audioSinConexion = (e as { tipo?: string }).tipo === "sin_conexion";
+      errorAudioAjustes = "No se pudo consultar el estado de la entrada por audio (¿sin conexión?).";
+    }
+  }
+
+  /** Por qué el micrófono no se puede usar ahora; "" si se puede; null si no corresponde mostrarlo (desactivado o desconocido). */
+  function motivoAudio(): string | null {
+    const s = d.sync;
+    if (!s || !s.pedirConSesion || !audioEstado || !audioEstado.activo) return null;
+    if (!s.hayCuenta()) return "Iniciá sesión para usar el micrófono.";
+    if (audioSinConexion || (doc.defaultView?.navigator as Navigator | undefined)?.onLine === false) return "Sin conexión: el micrófono necesita internet.";
+    if (!audioEstado.configurado) return "Falta configurar la entrada por audio en el servidor.";
+    return "";
+  }
+
+  function botonesAudio(): Node[] {
+    const motivo = motivoAudio();
+    if (motivo === null) return [];
+    if (faseAudio === "grabando") return [boton("Parar", () => grabadora?.detener(false), "chico", { id: "captura-parar" })];
+    const ocupado = faseAudio !== "";
+    return [boton("Micrófono", () => { void grabar(); }, "suave chico", { id: "captura-mic", ...(motivo !== "" || ocupado ? { disabled: true } : {}) })];
+  }
+
+  function textoEstadoAudio(): Node | null {
+    const motivo = motivoAudio();
+    if (motivo === null) return null;
+    const texto = faseAudio === "pidiendo" ? "Esperando permiso del micrófono…"
+      : faseAudio === "grabando" ? "Grabando… tocá Parar cuando termines (máximo 2 minutos)."
+      : faseAudio === "transcribiendo" ? "Transcribiendo…"
+      : mensajeAudio || motivo;
+    if (!texto) return null;
+    return h("p", { id: "audio-estado", class: mensajeAudio && faseAudio === "" ? "aviso" : "suave", role: "status" }, texto);
+  }
+
+  function agregarACaptura(texto: string): void {
+    const t = texto.trim();
+    if (!t) return;
+    textoCaptura = textoCaptura === "" ? t : `${textoCaptura}${/\s$/.test(textoCaptura) ? "" : "\n"}${t}`;
+  }
+
+  async function transcribir(audio: Blob, tipo: string): Promise<void> {
+    faseAudio = "transcribiendo";
+    redibujar();
+    try {
+      const r = await d.sync!.pedirConSesion!("/audio/transcribir", { method: "POST", headers: { "content-type": tipo }, body: audio });
+      if (!r.ok) {
+        let msg = "No se pudo transcribir el audio. Podés escribir el apunte.";
+        try { const j = (await r.json()) as { error?: unknown }; if (typeof j.error === "string") msg = j.error; } catch { /* mensaje genérico */ }
+        mensajeAudio = msg;
+      } else {
+        const j = (await r.json()) as { texto?: unknown };
+        agregarACaptura(typeof j.texto === "string" ? j.texto : "");
+        mensajeAudio = "";
+      }
+    } catch (e) {
+      const tipoError = (e as { tipo?: string }).tipo;
+      mensajeAudio = tipoError === "sesion" ? "Iniciá sesión para usar el micrófono."
+        : tipoError === "sin_conexion" ? "Sin conexión: no se pudo transcribir. Lo escrito sigue acá."
+        : "No se pudo transcribir el audio. Podés escribir el apunte.";
+    }
+    faseAudio = "";
+    redibujar();
+  }
+
+  async function grabar(): Promise<void> {
+    if (faseAudio !== "") return;
+    mensajeAudio = "";
+    const win = doc.defaultView as unknown as { navigator?: Navigator; MediaRecorder?: typeof MediaRecorder } | null;
+    const getUserMedia = win?.navigator?.mediaDevices?.getUserMedia?.bind(win.navigator.mediaDevices);
+    const Grabadora = win?.MediaRecorder;
+    if (!getUserMedia || !Grabadora) {
+      mensajeAudio = "Este navegador no permite grabar audio. Podés seguir escribiendo el apunte.";
+      redibujar();
+      return;
+    }
+    faseAudio = "pidiendo";
+    redibujar();
+    let flujo: MediaStream;
+    try {
+      flujo = await getUserMedia({ audio: true });
+    } catch {
+      faseAudio = "";
+      mensajeAudio = "No se pudo usar el micrófono (¿negaste el permiso?). Podés seguir escribiendo el apunte.";
+      redibujar();
+      return;
+    }
+    const trozos: Blob[] = [];
+    let bytes = 0;
+    let descartar = false;
+    let excedido = false;
+    let rec: MediaRecorder;
+    try {
+      rec = new Grabadora(flujo);
+    } catch {
+      flujo.getTracks().forEach((t) => t.stop());
+      faseAudio = "";
+      mensajeAudio = "Este navegador no permite grabar audio. Podés seguir escribiendo el apunte.";
+      redibujar();
+      return;
+    }
+    const temporizador = setTimeout(() => detener(false), TOPE_GRABACION_MS);
+    function detener(descarta: boolean): void {
+      if (descarta) descartar = true;
+      clearTimeout(temporizador);
+      if (rec.state !== "inactive") rec.stop();
+    }
+    rec.addEventListener("dataavailable", (ev) => {
+      const b = (ev as BlobEvent).data;
+      if (!b || b.size === 0) return;
+      bytes += b.size;
+      if (bytes > TOPE_AUDIO_BYTES) { excedido = true; detener(false); return; }
+      trozos.push(b);
+    });
+    rec.addEventListener("stop", () => {
+      clearTimeout(temporizador);
+      flujo.getTracks().forEach((t) => t.stop());
+      grabadora = null;
+      if (descartar) { faseAudio = ""; mensajeAudio = ""; redibujar(); return; }
+      if (excedido) { faseAudio = ""; mensajeAudio = "La grabación es demasiado larga (máximo 10 MB). Probá con algo más corto."; redibujar(); return; }
+      if (trozos.length === 0) { faseAudio = ""; mensajeAudio = "No se grabó nada. Probá de nuevo."; redibujar(); return; }
+      const tipo = ((rec.mimeType || trozos[0]!.type || "audio/webm").split(";")[0] as string).trim() || "audio/webm";
+      void transcribir(new Blob(trozos, { type: tipo }), tipo);
+    });
+    grabadora = { detener };
+    try {
+      rec.start(1000);
+    } catch {
+      grabadora = null;
+      clearTimeout(temporizador);
+      flujo.getTracks().forEach((t) => t.stop());
+      faseAudio = "";
+      mensajeAudio = "No se pudo empezar a grabar. Podés seguir escribiendo el apunte.";
+      redibujar();
+      return;
+    }
+    faseAudio = "grabando";
+    redibujar();
   }
 
   function filaApunte(a: Apunte, areas: { id: Id; nombre: string }[]): Node {
@@ -644,7 +814,38 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       errorAjustes && h("p", { class: "aviso", role: "alert" }, errorAjustes),
       d.sync && dibujarCuenta(d.sync),
       dibujarRespaldo(),
-      d.sync && dibujarExterno(d.sync));
+      d.sync && dibujarExterno(d.sync),
+      d.sync && dibujarAudioAjustes(d.sync));
+  }
+
+  function textoAudioAjustes(e: EstadoAudio): string {
+    if (!e.activo) return "Estado: desactivado.";
+    if (!e.configurado) return "Estado: falta configurar (falta la clave en el servidor; ver SECRETOS.md).";
+    return "Estado: activo.";
+  }
+
+  function dibujarAudioAjustes(s: ControlSync): Node {
+    const titulo = h("h2", {}, "Entrada por audio (opcional)");
+    const aviso1 = h("p", { class: "suave" },
+      "Si lo activás, al grabar una idea el audio se manda a Groq para transcribirlo. No se guarda en ningún lado: el servidor lo descarta apenas responde. Si está desactivado, no sale ningún audio. Es opcional: la app funciona completa sin esto.");
+    if (!s.hayCuenta() || !s.pedirConSesion) {
+      return h("div", { class: "audio-ajustes" }, titulo, aviso1, h("p", { class: "suave", id: "audio-ajustes-estado" }, "Iniciá sesión para configurarlo."));
+    }
+    if (!audioEstado) {
+      return h("div", { class: "audio-ajustes" }, titulo, aviso1,
+        h("p", { class: "aviso", role: "alert", id: "audio-ajustes-estado" }, errorAudioAjustes || "No se pudo consultar el estado."));
+    }
+    const pedir = s.pedirConSesion.bind(s);
+    const interruptor = h("input", { type: "checkbox", id: "audio-activo", checked: audioEstado.activo }) as HTMLInputElement;
+    interruptor.checked = audioEstado.activo;
+    interruptor.addEventListener("change", () => accion(async () => {
+      const r = await pedir("/ajustes/audio", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ activo: interruptor.checked }) });
+      if (!r.ok) throw new Error("No se pudo guardar el cambio.");
+    }));
+    return h("div", { class: "audio-ajustes" }, titulo, aviso1,
+      h("label", {}, interruptor, " Permitir dictar apuntes con el micrófono"),
+      h("p", { id: "audio-ajustes-estado", role: "status" }, textoAudioAjustes(audioEstado)),
+      errorAudioAjustes && h("p", { class: "aviso", role: "alert" }, errorAudioAjustes));
   }
 
   /** Consulta el estado del respaldo externo (solo con sesión). Sin conexión o error: se avisa y la pantalla sigue andando. */

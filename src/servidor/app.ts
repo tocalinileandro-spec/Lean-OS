@@ -13,6 +13,7 @@ import { Sesiones } from "./sesiones.ts";
 import { aplicarPush, LIMITE_PULL, LIMITE_PULL_MAXIMO, leerPull, validarPush } from "./sync.ts";
 import { exportarTodo } from "./respaldo.ts";
 import { ServicioRespaldoExterno } from "./respaldo-externo.ts";
+import { AUDIO_MAXIMO_BYTES, ErrorProveedor, ServicioAudio, TIPOS_AUDIO } from "./audio.ts";
 
 export interface Dependencias {
   reloj: Reloj;
@@ -22,6 +23,8 @@ export interface Dependencias {
   registrar?: (linea: string) => void;
   /** Respaldo externo opcional. Si no se pasa, queda "sin configurar". */
   respaldoExterno?: ServicioRespaldoExterno;
+  /** Entrada por audio opcional. Si no se pasa, queda "sin configurar". */
+  audio?: ServicioAudio;
 }
 
 /** IP del cliente: Fly agrega Fly-Client-IP; si no, la del socket. No se confía en X-Forwarded-For (lo puede inventar el cliente). */
@@ -114,6 +117,7 @@ export function crearApp(deps: Dependencias): Hono {
   app.use("/sync/*", exigirSesion);
   app.use("/export", exigirSesion);
   app.use("/ajustes/*", exigirSesion);
+  app.use("/audio/*", exigirSesion);
   app.use("/ajustes/*", async (c, next) => {
     await next();
     c.res.headers.set("Cache-Control", "no-store");
@@ -138,6 +142,47 @@ export function crearApp(deps: Dependencias): Hono {
   app.post("/ajustes/respaldo-externo/probar", async (c) => {
     if (!externo.activo()) return c.json({ error: "Activá el respaldo externo antes de probarlo." }, 409);
     return c.json(await externo.subirAhora());
+  });
+
+  const audio = deps.audio ?? new ServicioAudio({ db: deps.base, hayClave: false, proveedor: null });
+  app.get("/ajustes/audio", (c) => c.json({ activo: audio.activo(), configurado: audio.configurado() }));
+  app.put("/ajustes/audio", bodyLimit({ maxSize: 1024, onError: demasiadoGrande }), async (c) => {
+    let activo: unknown;
+    try {
+      activo = ((await c.req.json()) as { activo?: unknown }).activo;
+    } catch {
+      return c.json({ error: "El cuerpo no es un JSON válido." }, 400);
+    }
+    if (typeof activo !== "boolean") return c.json({ error: "Falta activo (verdadero o falso)." }, 400);
+    audio.fijarActivo(activo);
+    return c.json({ activo, configurado: audio.configurado() });
+  });
+
+  app.use("/audio/*", async (c, next) => {
+    await next();
+    c.res.headers.set("Cache-Control", "no-store");
+  });
+  app.post("/audio/transcribir", bodyLimit({
+    maxSize: AUDIO_MAXIMO_BYTES,
+    onError: (c) => c.json({ error: "El audio es demasiado grande (máximo 10 MB). Grabá algo más corto." }, 413),
+  }), async (c) => {
+    if (!audio.activo()) return c.json({ error: "La entrada por audio está desactivada. Activala en Ajustes." }, 403);
+    if (!audio.configurado()) return c.json({ error: "Falta configurar la entrada por audio en el servidor (ver SECRETOS.md)." }, 409);
+    const tipo = (c.req.header("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+    if (!(TIPOS_AUDIO as readonly string[]).includes(tipo)) {
+      return c.json({ error: "Ese tipo de audio no se admite (usá webm, ogg, mp4, mp3 o wav)." }, 415);
+    }
+    const bytes = new Uint8Array(await c.req.arrayBuffer());
+    if (bytes.length === 0) return c.json({ error: "No llegó ningún audio." }, 400);
+    if (bytes.length > AUDIO_MAXIMO_BYTES) return c.json({ error: "El audio es demasiado grande (máximo 10 MB). Grabá algo más corto." }, 413);
+    try {
+      return c.json({ texto: await audio.transcribir(bytes, tipo) });
+    } catch (e) {
+      const motivo = e instanceof ErrorProveedor ? e.motivo : "fallo";
+      if (motivo === "cuota") return c.json({ error: "Se agotó la cuota gratuita de transcripción por ahora. Probá más tarde; mientras tanto podés escribir el apunte." }, 429);
+      if (motivo === "tiempo") return c.json({ error: "La transcripción tardó demasiado y se canceló. Probá de nuevo; lo escrito no se perdió." }, 504);
+      return c.json({ error: "No se pudo transcribir el audio ahora. Probá de nuevo más tarde; podés escribir el apunte." }, 502);
+    }
   });
 
   app.post("/sync/push", async (c) => {

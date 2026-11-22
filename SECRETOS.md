@@ -1,6 +1,6 @@
 # Secretos: cómo cargarlos
 
-Lean OS usa cuatro secretos (sección 7 de `docs/VISION.md`), más cuatro opcionales para el respaldo externo (sección 4 de esta guía). Ninguno va al repositorio: se cargan una sola vez en los lugares de esta guía. `.env` ya está en `.gitignore` y `.env.example` tiene solo los nombres.
+Lean OS usa cuatro secretos (sección 7 de `docs/VISION.md`), más cuatro opcionales para el respaldo externo (sección 4 de esta guía) y una opcional para la entrada por audio (sección 5). Ninguno va al repositorio: se cargan una sola vez en los lugares de esta guía. `.env` ya está en `.gitignore` y `.env.example` tiene solo los nombres.
 
 Los comandos de Windows son para `cmd`; en Linux y Mac son los mismos salvo donde se indica. No pegues los secretos en el chat, en commits ni en capturas.
 
@@ -130,3 +130,23 @@ Secretos opcionales: `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET` (nombre del bucket, 
    set RESPALDO_CLAVE=
    ```
    Con una clave equivocada no restaura nada y lo avisa. En Fly, el script corre dentro de la máquina (`fly ssh console`, con el archivo subido a `/data`); la guía de restauración general es la misma que para los `.json`.
+
+## 5. Entrada por audio (opcional): Groq
+
+Es opcional y viene **desactivada**. Si la activás, en la captura rápida de apuntes aparece un botón de micrófono: grabás una idea, el servidor manda el audio a Groq (modelo Whisper) para transcribirlo y el texto cae en la caja de captura para que lo revises y lo guardes vos. El audio **no se guarda** en ningún lado: el servidor lo descarta apenas responde. Sin activarla en Ajustes, o sin la clave, no sale ningún audio. La app funciona completa sin esto.
+
+Secreto opcional: `GROQ_API_KEY`. Va a Fly; `.env.example` tiene el nombre vacío. La clave nunca llega al navegador ni al .exe: solo la usa el servidor.
+
+1. Creá la cuenta en https://console.groq.com (hay plan gratuito; confirmá en la página qué te pide).
+2. Creá la clave: en la consola, API Keys > Create API Key. Poné un nombre (por ejemplo `lean-os`) y copiala: se muestra **una sola vez**.
+3. Cargala en Fly (Linux/Mac/PowerShell; en Windows `cmd` poné `GROQ_API_KEY=<tu clave>` entre comillas dobles):
+   ```
+   fly secrets set --app lean-os GROQ_API_KEY='<tu clave de Groq>'
+   ```
+   Comprobá el nombre: `fly secrets list --app lean-os`.
+4. Activala en la app: Ajustes > "Entrada por audio (opcional)" > marcá el interruptor (hace falta tener la sesión iniciada). El estado debe pasar de "falta configurar" a "activo".
+5. Para desactivarla: el mismo interruptor.
+
+**Cuota gratuita:** el plan gratuito de Groq tiene un tope diario de uso. Si se agota, la app avisa "se agotó la cuota" y podés seguir escribiendo; se renueva solo con el tiempo. Pasar a un plan pago sería una decisión y un costo tuyos. Los límites exactos están en la página de Groq y pueden cambiar.
+
+Cuando el micrófono funciona, el navegador te pide permiso la primera vez que tocás el botón.

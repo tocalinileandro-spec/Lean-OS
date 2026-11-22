@@ -93,3 +93,8 @@ Es la misma app empaquetada en un solo archivo, `Lean-OS.exe` (no instala nada y
 6. **Puerto:** usa el puerto local 47821 (fijo, porque de él depende dónde se guardan los datos). Si está ocupado, la app avisa y no abre; cerrá la otra copia o el programa que lo usa. `LEAN_OS_PUERTO` lo cambia, pero con otro puerto no ves los datos de antes.
 7. **Modos de prueba (solo para el CI):** con la variable `LEAN_OS_PRUEBA` = `salud`, `s1-escribir` o `s1-leer` el .exe hace una comprobación y se cierra con código 0 (o 1 si falla); `LEAN_OS_DATOS` fija la carpeta de datos (usá una temporal, nunca la real). En uso normal esas variables no existen. Para correrlos todos: `node escritorio/probar-exe.ts` (en Windows, con el .exe ya armado).
 8. **Armarlo a mano (Windows):** `npm ci`, `npm run build`, `node escritorio/compilar.ts`, luego en `escritorio\`: `npm ci` y `npm run empaquetar`. Sale `escritorio\salida\Lean-OS.exe`.
+
+## 9. Entrada por audio (opcional)
+
+Sin la clave de Groq (ver `SECRETOS.md`, sección 5) la app anda igual y Ajustes dice "falta configurar". Para probarla en tu PC: corré el servidor con la variable `GROQ_API_KEY` cargada en tu terminal (no en el repositorio), entrá, activá el interruptor en Ajustes > "Entrada por audio (opcional)" y en Apuntes > "Nuevo apunte" tocá "Micrófono". El texto aparece en la caja y no se guarda hasta que toques "Guardar apunte". Las pruebas automáticas (O7 a O12) usan un proveedor simulado y no llaman a Groq.
+

@@ -105,6 +105,17 @@ describe("B2: servidor local de la app de Windows", () => {
     ]);
   });
 
+  it("B2: el proxy reenvía /audio/transcribir con el tipo de contenido y el cuerpo tal cual", async () => {
+    const remoto = await remotoFalso();
+    const s = await local({ servidorRemoto: remoto.url });
+    await fetch(`${s.url}/audio/transcribir`, { method: "POST", headers: { authorization: "Bearer abc", "content-type": "audio/webm" }, body: "bytes-de-audio" });
+    await fetch(`${s.url}/ajustes/audio`, { headers: { authorization: "Bearer abc" } });
+    expect(remoto.pedidos).toEqual([
+      { metodo: "POST", url: "/audio/transcribir", auth: "Bearer abc", tipo: "audio/webm", cuerpo: "bytes-de-audio" },
+      { metodo: "GET", url: "/ajustes/audio", auth: "Bearer abc", tipo: undefined, cuerpo: "" },
+    ]);
+  });
+
   it("B2: sin red (o sin servidor configurado, o con timeout) el proxy responde 502 con JSON en castellano", async () => {
     const remoto = await remotoFalso();
     const caido = await local({ servidorRemoto: "http://127.0.0.1:1" });
