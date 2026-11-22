@@ -189,6 +189,23 @@ describe("interfaz web", () => {
     expect(ui.raiz.textContent).not.toMatch(/cola|Completalo|Error/);
   });
 
+  it("R9: si se borra la tarjeta con la respuesta visible, la siguiente no muestra su respuesta ni se califica con '3'", async () => {
+    const { ui } = await conTarjetas();
+    ui.app.ir("repaso");
+    await ui.app.esperar();
+    await ui.clic("Ver pista");
+    await ui.tecla(" ");
+    expect(ui.raiz.textContent).toContain("termina la función");
+    const [q1] = await ui.almacen.tarjetas.listar();
+    await borrarTarjeta(ui.almacen, new RelojSimulado("2026-11-22T15:00:00.000Z"), q1!.id);
+    await ui.tecla("z", { ctrlKey: true }); // sin nada que deshacer: solo redibuja
+    expect(ui.raiz.textContent).toContain("P2");
+    expect(ui.raiz.textContent).not.toContain("R2");
+    await ui.tecla("3");
+    expect((await ui.almacen.repasos.listar())).toHaveLength(0);
+    expect(ui.raiz.textContent).not.toContain("R2");
+  });
+
   it("formatearFecha usa dd/mm/aaaa", () => {
     expect(formatearFecha("2026-11-22")).toBe("22/11/2026");
   });

@@ -132,8 +132,9 @@ export interface VistaRepaso {
 }
 
 export class PantallaRepaso {
-  #respuestaVisible = false;
-  #pistaVisible = false;
+  /** Tarjeta para la que se pidió la respuesta / la pista: solo vale para esa tarjeta (R9). */
+  #idRespuesta: Id | undefined;
+  #idPista: Id | undefined;
   #calificadas = 0;
 
   private constructor(private d: Dependencias, private sesion: SesionRepaso) {}
@@ -146,10 +147,10 @@ export class PantallaRepaso {
 
   /** Sin tarjeta actual (por ejemplo, la borraron desde otra pestaña) no hace nada. */
   async verRespuesta(): Promise<void> {
-    if ((await this.sesion.siguiente()) !== undefined) this.#respuestaVisible = true;
+    this.#idRespuesta = await this.sesion.siguiente();
   }
   async verPista(): Promise<void> {
-    if ((await this.sesion.siguiente()) !== undefined) this.#pistaVisible = true;
+    this.#idPista = await this.sesion.siguiente();
   }
 
   async vista(): Promise<VistaRepaso> {
@@ -157,6 +158,8 @@ export class PantallaRepaso {
     const base = { pendientes: this.sesion.pendientes, calificadas: this.#calificadas, puedeDeshacer: this.#calificadas > 0 };
     if (id === undefined) return { hayTarjeta: false, ...base };
     const t = (await this.d.almacen.tarjetas.obtener(id))!;
+    const respuestaVisible = this.#idRespuesta === id;
+    const pistaVisible = this.#idPista === id;
     const areas = await this.d.almacen.areas.listar();
     const area = areas.find((a) => a.id === t.area_id);
     const v: VistaRepaso = {
@@ -164,10 +167,10 @@ export class PantallaRepaso {
       area: area ? nombreDeArea(area, areas) : "",
       pregunta: t.pregunta,
       hayPista: !!t.pista,
-      respuestaVisible: this.#respuestaVisible,
+      respuestaVisible,
     };
-    if (t.pista && this.#pistaVisible) v.pista = t.pista;
-    if (this.#respuestaVisible) {
+    if (t.pista && pistaVisible) v.pista = t.pista;
+    if (respuestaVisible) {
       v.respuesta = t.respuesta;
       const hoy = diaLogico(this.d.reloj);
       v.botones = CALIFICACIONES.map((b, i) => ({
@@ -180,18 +183,19 @@ export class PantallaRepaso {
 
   /** Solo califica si ya se vio la respuesta. */
   async calificar(boton: Calificacion): Promise<void> {
-    if (!this.#respuestaVisible || (await this.sesion.siguiente()) === undefined) return;
+    const id = await this.sesion.siguiente();
+    if (id === undefined || this.#idRespuesta !== id) return;
     await this.sesion.calificar(boton);
     this.#calificadas++;
-    this.#respuestaVisible = false;
-    this.#pistaVisible = false;
+    this.#idRespuesta = undefined;
+    this.#idPista = undefined;
   }
 
   async deshacer(): Promise<void> {
     if (await this.sesion.deshacer()) {
       this.#calificadas = Math.max(0, this.#calificadas - 1);
-      this.#respuestaVisible = false;
-      this.#pistaVisible = false;
+      this.#idRespuesta = undefined;
+      this.#idPista = undefined;
     }
   }
 }
