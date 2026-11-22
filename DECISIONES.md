@@ -262,3 +262,23 @@ Formato: fecha, qué se eligió, por qué.
 ## 2026-11-22 (O-recurrentes, ciclo 2: robustez ante datos corruptos)
 
 - Una regla que no pasa `validarRepeticion` (llegada por servidor, sync o importación) se trata como sin repetición: `marcarHecha` marca hecha, no genera siguiente y nunca lanza. Una fecha que no pasa el formato AAAA-MM-DD real (`esFechaReal`) se trata como sin fecha (base = hoy). `describirRepeticion` devuelve vacío con reglas inválidas, y la lista y el formulario las ignoran (el selector queda en "No"). El dato roto no se modifica ni se borra hasta que el dueño guarde la tarea. Helper: `reglaValida`.
+
+## 2026-11-22 (opcional 4: gráficos de estadísticas, criterios)
+
+- **Criterios O20-O24 agregados a la sección 4 y un párrafo "Gráficos" al módulo 1 de la sección 2** de docs/VISION.md antes de construirlo. Sin clave ni servicio externo.
+- **Decisiones de diseño:** SVG inline propio (sin biblioteca de gráficos: una dependencia pesada para cuatro gráficos simples contradice "dependencias mínimas" y la CSP `default-src 'none'`); los gráficos solo leen datos ya calculados con las mismas reglas de las estadísticas mínimas (repasos vigentes, día lógico, el Área suma sus subáreas); el panel se abre desde Hoy y no agrega una pantalla a la navegación.
+
+## 2026-11-22 (O-graficos: gráficos de estadísticas, O20-O24)
+
+- **Cálculo (`src/compartido/graficos.ts`, puro):** `repasosPorDia` (30 días, ceros, orden cronológico), `retencion`, `tarjetasPorArea` y `tareasHechasPorSemana` (8 semanas, lunes a domingo). Reciben listas ya leídas y `hoy` (día lógico) como parámetro; `datosGraficos` solo lee del almacén. Una pasada por colección con mapas. Repasos: `repasosVigentes` (lo deshecho y sus compensaciones no cuentan).
+- **Retención:** acierto = Bien o Fácil. Difícil y Otra vez cuentan en el total pero no como acierto (la visión pide "Bien o Fácil sobre el total"). Período: los últimos 30 días lógicos incluido hoy. Porcentaje entero redondeado (mitad hacia arriba, 62,5 -> 63); sin repasos en el período devuelve `null` y se muestra "Sin datos" (nunca divide por cero).
+- **Tarjetas por área:** se factorizó la cuenta de las estadísticas mínimas en `totalesPorArea` (exportada desde `estadisticas.ts`), usada por ambas; mismo resultado (la prueba O24 lo compara contra la cuenta anterior escrita aparte). Las estadísticas mínimas no cambiaron de comportamiento; se mejoró solo la complejidad (mapa de subáreas en vez de recorrer todas las áreas por área).
+- **Rendimiento:** `diaLogico` convertía el instante creando un `Intl.DateTimeFormat` por llamada (lento con 20.000 repasos). Se agregó `diaLogicoDeMs` en `dia.ts` con el formateador cacheado por zona; `diaLogico` lo usa y da el mismo resultado.
+- **Dibujo (`src/cliente/ui/graficos-svg.ts`):** cada gráfico es un `<figure>` con el SVG (createElementNS, `role="img"`, `<title>` y `<desc>`), etiquetas visibles y una lista accesible (`.solo-lectores`) con todos los valores. Los nombres van siempre por `textContent`. Colores por clases CSS con variables del tema (`.g-barra`, `.g-pista`, etc. en `estilos.css`; sin hex fijos ni atributos `style`, así la CSP `style-src 'self'` no cambia). Los nombres largos se recortan con "…" en la barra (completos en la lista y el `<desc>`). Sin datos: mensaje en castellano en lugar del SVG ("Todavía no hay repasos para mostrar", "Sin datos: ...", etc.).
+- **UI:** botón "Ver estadísticas" / "Ocultar estadísticas" en Hoy (`aria-expanded`); el panel muestra los números de las estadísticas mínimas y los cuatro gráficos. Se cierra con el mismo botón, con Escape o al cambiar de pantalla; no es una pantalla de la navegación. Se redibuja con Hoy (datos nuevos de sincronización o acciones), y solo lee.
+- **Pruebas:** `pruebas/o-graficos.test.ts` (O20-O24); O20-O24 en `TODOS_LOS_IDS`, fase 6 e `IDS_EXIGIBLES` (solo se amplía).
+
+## 2026-11-22 (O-graficos, ciclo 2: tolerancia a instantes inválidos)
+
+- Un `repasado_en` o `hecha_en` que no es una fecha válida (dato dañado, por ejemplo llegado por sincronización) hacía lanzar `RangeError` al convertir a día lógico, y `dibujar()` reemplazaba toda la pantalla Hoy por el aviso de error. Se agregó `diaLogicoDeInstante` (devuelve null si el instante es inválido) en `dia.ts`. Los cuatro cálculos de `graficos.ts`, `calcularEstadisticas` (racha y repasadas hoy) y el descuento de nuevas de `construirCola` saltean el registro inválido. Con datos válidos el resultado es idéntico. El dato dañado no se modifica ni se borra. Una tarjeta con área huérfana ya no rompía nada (solo cuenta en su `area_id`, que no figura entre las áreas).
+- O24 ahora hace un calentamiento previo y toma el mínimo de 3 corridas, manteniendo el tope de 500 ms.

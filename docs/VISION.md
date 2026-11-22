@@ -70,6 +70,8 @@ Reglas del cálculo: reps suma 1 con Difícil, Bien y Fácil. El intervalo se re
 
 **Estadísticas mínimas.** Pendientes hoy, repasadas hoy, racha de días seguidos con repaso y total de tarjetas por área.
 
+**Gráficos (opcional, sección 8).** Desde Hoy se abre un panel de estadísticas con repasos por día (30 días), retención (Bien o Fácil sobre el total de 30 días), tarjetas por área y tareas hechas por semana (8 semanas), dibujados con SVG propio y sin servicios externos. Solo leen los datos: no agregan ni cambian nada.
+
 ### Módulo 2: Tareas y metas
 
 - **Jerarquía.** Meta anual > meta trimestral > tarea. Cada nivel de arriba es opcional: una tarea puede no tener meta.
@@ -133,7 +135,7 @@ Ante cualquier duda, la app elige lo que no pierde datos y no pregunta; la únic
 
 Una función está terminada solo cuando su prueba pasa sola, sin intervención humana. Un único comando (`npm run verificar`) corre todas las pruebas con reloj simulado y datos de ejemplo, y escribe REPORTE.md con el resultado de cada ID. Para poder simular el tiempo, el código recibe el reloj como dependencia.
 
-Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio O7-O12, tareas recurrentes O13-O19 y gráficos; cada grupo se agrega antes de construirlo).
+Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio O7-O12, tareas recurrentes O13-O19 y gráficos O20-O24; cada grupo se agrega antes de construirlo).
 
 | ID | Qué hace la prueba | Resultado esperado |
 | --- | --- | --- |
@@ -191,6 +193,11 @@ Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G se
 | O17 | Marcar, desmarcar y volver a marcar la misma tarea recurrente, y marcarla en dos dispositivos sin conexión que luego sincronizan | Existe una sola ocurrencia siguiente (id determinista), sin duplicados |
 | O18 | Crear una tarea con repetición desde el formulario, editar la regla, “dejar de repetir” y borrar una ocurrencia | La regla se guarda; al dejar de repetir ya no se generan más; borrar una ocurrencia solo borra esa (a la papelera); Hoy y Bandeja muestran la ocurrencia vigente |
 | O19 | Tareas y respaldos creados antes de esta función (sin campos de repetición), sincronizarlos y exportar/importar una tarea con regla | Siguen siendo válidos y se comportan como antes (T1 y T2 intactos); el servidor acepta tareas con y sin regla; la regla se conserva en el export y la importación |
+| O20 | Repasos de ejemplo repartidos en 30 días simulados (con un deshacer entre ellos) y abrir los gráficos | “Repasos por día” muestra la cantidad correcta de calificaciones vigentes de cada día lógico (lo deshecho y sus compensaciones no cuentan) y cero en los días sin repasos |
+| O21 | Calcular la retención (respuestas Bien o Fácil sobre el total de los últimos 30 días) con datos de ejemplo y sin ningún repaso | El porcentaje es el correcto; sin repasos muestra “Sin datos” y nunca divide por cero |
+| O22 | Tarjetas por área y tareas hechas por semana (últimas 8 semanas) con datos de ejemplo | Las barras por área suman las subáreas en el Área (igual que las estadísticas mínimas) y las tareas hechas se cuentan en la semana (lunes a domingo, día lógico) en que se marcaron |
+| O23 | Abrir los gráficos con datos, sin datos, en tema claro y oscuro, y revisar la página | Se dibujan con SVG propio, sin librerías ni recursos externos (la política CSP no cambia), con rol de imagen, texto alternativo y los valores también como texto; sin datos muestran un estado vacío en castellano |
+| O24 | 20.000 repasos y 5.000 tarjetas: calcular todos los gráficos; y las estadísticas mínimas de antes | El cálculo tarda menos de 500 ms y las estadísticas mínimas (pendientes hoy, repasadas hoy, racha, total por área) dan el mismo resultado que antes |
 
 ## 5. Arquitectura y tecnologías
 
