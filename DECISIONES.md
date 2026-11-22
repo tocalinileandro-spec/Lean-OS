@@ -262,3 +262,8 @@ Formato: fecha, qué se eligió, por qué.
 ## 2026-11-22 (O-recurrentes, ciclo 2: robustez ante datos corruptos)
 
 - Una regla que no pasa `validarRepeticion` (llegada por servidor, sync o importación) se trata como sin repetición: `marcarHecha` marca hecha, no genera siguiente y nunca lanza. Una fecha que no pasa el formato AAAA-MM-DD real (`esFechaReal`) se trata como sin fecha (base = hoy). `describirRepeticion` devuelve vacío con reglas inválidas, y la lista y el formulario las ignoran (el selector queda en "No"). El dato roto no se modifica ni se borra hasta que el dueño guarde la tarea. Helper: `reglaValida`.
+
+## 2026-11-22 (opcional 4: gráficos de estadísticas, criterios)
+
+- **Criterios O20-O24 agregados a la sección 4 y un párrafo "Gráficos" al módulo 1 de la sección 2** de docs/VISION.md antes de construirlo. Sin clave ni servicio externo.
+- **Decisiones de diseño:** SVG inline propio (sin biblioteca de gráficos: una dependencia pesada para cuatro gráficos simples contradice "dependencias mínimas" y la CSP `default-src 'none'`); los gráficos solo leen datos ya calculados con las mismas reglas de las estadísticas mínimas (repasos vigentes, día lógico, el Área suma sus subáreas); el panel se abre desde Hoy y no agrega una pantalla a la navegación.
