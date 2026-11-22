@@ -237,3 +237,8 @@ Formato: fecha, qué se eligió, por qué.
 - **Service worker y .exe:** `/audio` suma a `PREFIJOS_API` y al proxy del escritorio (con prueba B2). La CSP no cambió: la grabación no usa dominios externos y el cliente solo habla con su propio origen.
 - **Pruebas:** `pruebas/o-audio.test.ts` (O7-O12). O12 busca la clave de prueba, `GROQ_API_KEY` y `api.groq.com` en `dist/app.js` (requiere `npm run build` previo, como la prueba PWA). `fase-actual.ts`: O7-O12 en `TODOS_LOS_IDS`, fase 6 e `IDS_EXIGIBLES` (solo se amplía).
 
+## 2026-11-22 (O-audio, ciclo 2: pruebas sin depender de dist/)
+
+- `build.ts` acepta la variable `LEAN_OS_DIST` (carpeta de salida; por defecto `dist`, así `npm run build` no cambia). La prueba PWA y la O12 del bundle compilan cada una en su propia carpeta temporal, por lo que ninguna depende de un build previo ni se pisan entre sí ni con `dist/`.
+- Se agregó a O10 una prueba de subida chunked sin Content-Length (flujo de 200 MB): responde 413, el flujo se corta cerca del tope (no se consume entero) y no se llama al proveedor.
+

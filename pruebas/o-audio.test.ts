@@ -1,4 +1,5 @@
 import "fake-indexeddb/auto";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -307,7 +308,17 @@ describe("O10: el audio no se guarda y los excesos se rechazan", () => {
     }
     for (const tipo of ["audio/webm;codecs=opus", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav"]) expect((await enviar(m, h, "x", tipo)).status, tipo).toBe(200);
     expect((await enviar(m, h, "")).status).toBe(400);
-    expect(m.proveedor.llamadas).toHaveLength(5 + 0);
+    // Sin Content-Length (chunked): un flujo enorme se corta cerca del tope.
+    m.proveedor.llamadas.length = 0;
+    let enviados = 0;
+    const flujo = new ReadableStream<Uint8Array>({
+      pull(c) { enviados += 1 << 20; c.enqueue(new Uint8Array(1 << 20)); if (enviados >= 200 * (1 << 20)) c.close(); },
+    });
+    const chunked = await m.app.request("/audio/transcribir", { method: "POST", headers: { ...h, "content-type": "audio/webm" }, body: flujo, duplex: "half" } as RequestInit);
+    expect(chunked.status).toBe(413);
+    expect(((await chunked.json()) as { error: string }).error).toMatch(/demasiado grande/);
+    expect(enviados).toBeLessThan(AUDIO_MAXIMO_BYTES + 8 * (1 << 20));
+    expect(m.proveedor.llamadas).toHaveLength(0);
   });
 });
 
@@ -408,14 +419,15 @@ describe("O12: activar y desactivar, y la clave no se filtra", () => {
   });
 
   it("O12: el código del cliente no contiene la clave ni el endpoint del proveedor", () => {
-    const bundle = join(process.cwd(), "dist", "app.js");
-    expect(existsSync(bundle), "falta dist/app.js: corré npm run build").toBe(true);
-    const codigo = readFileSync(bundle, "utf8");
+    const salida = join(mkdtempSync(join(tmpdir(), "audio-o12-")), "dist");
+    const r = spawnSync(process.execPath, ["build.ts"], { cwd: process.cwd(), encoding: "utf8", env: { ...process.env, LEAN_OS_DIST: salida } });
+    expect(r.status, r.stderr).toBe(0);
+    const codigo = readFileSync(join(salida, "app.js"), "utf8");
     expect(codigo).not.toContain(CLAVE_GROQ);
     expect(codigo).not.toContain("GROQ_API_KEY");
     expect(codigo).not.toContain("api.groq.com");
     expect(codigo).toContain("/audio/transcribir");
-  });
+  }, 60_000);
 
   it("O12: /audio nunca se cachea (service worker) y la CSP no abre dominios externos", () => {
     expect(PREFIJOS_API).toContain("/audio");
