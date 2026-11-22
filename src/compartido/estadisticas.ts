@@ -2,7 +2,7 @@
 import type { Almacen } from "./almacen.ts";
 import { diaLogico } from "./dia.ts";
 import type { FechaISO, Id } from "./esquema.ts";
-import { construirCola, repasosVigentes, sumarDias } from "./repaso.ts";
+import { construirCola, repasosVigentes, sumarDias, type OpcionesCola } from "./repaso.ts";
 import type { Reloj } from "./reloj.ts";
 
 export interface TotalPorArea {
@@ -24,7 +24,7 @@ export interface Estadisticas {
 
 const diaDe = (iso: string): FechaISO => diaLogico({ ahora: () => new Date(iso) });
 
-export async function calcularEstadisticas(almacen: Almacen, reloj: Reloj): Promise<Estadisticas> {
+export async function calcularEstadisticas(almacen: Almacen, reloj: Reloj, opcionesCola: OpcionesCola = {}): Promise<Estadisticas> {
   const hoy = diaLogico(reloj);
   const vigentes = repasosVigentes(await almacen.repasos.listar());
   const dias = new Set(vigentes.map((r) => diaDe(r.repasado_en)));
@@ -45,5 +45,5 @@ export async function calcularEstadisticas(almacen: Almacen, reloj: Reloj): Prom
     area_id: a.id, nombre: a.nombre,
     total: (directas.get(a.id) ?? 0) + areas.filter((h) => h.padre_id === a.id).reduce((n, h) => n + (directas.get(h.id) ?? 0), 0),
   }));
-  return { pendientesHoy: (await construirCola(almacen, reloj)).length, repasadasHoy, racha, porArea };
+  return { pendientesHoy: (await construirCola(almacen, reloj, opcionesCola)).length, repasadasHoy, racha, porArea };
 }

@@ -1,11 +1,19 @@
 import { HORA_CAMBIO_DE_DIA, ZONA_HORARIA, type FechaISO } from "./esquema.ts";
 import type { Reloj } from "./reloj.ts";
 
+let horaCambioActual: string = HORA_CAMBIO_DE_DIA;
+
+/** Hora de cambio de día que se usa cuando no se pasa una (la fija Ajustes). */
+export function fijarHoraCambio(hora: string = HORA_CAMBIO_DE_DIA): void {
+  if (!/^(\d{1,2}):(\d{2})$/.test(hora)) throw new Error(`Hora de cambio inválida: ${hora}`);
+  horaCambioActual = hora;
+}
+
 /**
  * Día lógico (AAAA-MM-DD) del reloj: el día cambia a `horaCambio` (HH:MM) en la zona dada.
  * Se resta la hora de cambio al instante y se toma la fecha local de la zona (Intl, sin dependencias).
  */
-export function diaLogico(reloj: Reloj, horaCambio: string = HORA_CAMBIO_DE_DIA, zona: string = ZONA_HORARIA): FechaISO {
+export function diaLogico(reloj: Reloj, horaCambio: string = horaCambioActual, zona: string = ZONA_HORARIA): FechaISO {
   const m = /^(\d{1,2}):(\d{2})$/.exec(horaCambio);
   if (!m) throw new Error(`Hora de cambio inválida: ${horaCambio}`);
   const minutos = Number(m[1]) * 60 + Number(m[2]);

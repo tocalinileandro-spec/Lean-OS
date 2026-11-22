@@ -14,5 +14,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src", "pruebas", "servidor", "verificar.ts", "fase-actual.ts", "vitest.config.ts"]
+  "include": ["src", "pruebas", "servidor", "verificar.ts", "build.ts", "fase-actual.ts", "vitest.config.ts"]
 }

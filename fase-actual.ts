@@ -29,5 +29,5 @@ export const FASE_DE_CADA_ID: Record<IdPrueba, number> = {
   B2: 5,
 };
 
-/** IDs exigibles hoy. Se amplía por fase (fase 1: B1; fase 2 en curso: se suman I1-I7). */
-export const IDS_EXIGIBLES: readonly IdPrueba[] = ["B1", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "S1"];
+/** IDs exigibles hoy. Se amplía por fase (fase 1: B1; fase 2 en curso: se suman I1-I7, R1-R9, S1). */
+export const IDS_EXIGIBLES: readonly IdPrueba[] = ["B1", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "S1"];
