@@ -1,6 +1,6 @@
 /** Estadísticas mínimas (módulo 1). Funciones puras sobre el Almacén y el reloj. */
 import type { Almacen } from "./almacen.ts";
-import { diaLogico } from "./dia.ts";
+import { diaLogico, diaLogicoDeInstante } from "./dia.ts";
 import type { Area, FechaISO, Id, Tarjeta } from "./esquema.ts";
 import { construirCola, repasosVigentes, sumarDias, type OpcionesCola } from "./repaso.ts";
 import type { Reloj } from "./reloj.ts";
@@ -31,13 +31,20 @@ export function totalesPorArea(areas: Area[], tarjetas: Tarjeta[]): TotalPorArea
   return areas.map((a) => ({ area_id: a.id, nombre: a.nombre, total: (directas.get(a.id) ?? 0) + (deHijas.get(a.id) ?? 0) }));
 }
 
-const diaDe = (iso: string): FechaISO => diaLogico({ ahora: () => new Date(iso) });
+const diaDe = (iso: string): FechaISO | null => diaLogicoDeInstante(iso);
 
 export async function calcularEstadisticas(almacen: Almacen, reloj: Reloj, opcionesCola: OpcionesCola = {}): Promise<Estadisticas> {
   const hoy = diaLogico(reloj);
   const vigentes = repasosVigentes(await almacen.repasos.listar());
-  const dias = new Set(vigentes.map((r) => diaDe(r.repasado_en)));
-  const repasadasHoy = vigentes.filter((r) => diaDe(r.repasado_en) === hoy).length;
+  // Un repaso con instante inválido (dato dañado) se saltea.
+  const dias = new Set<FechaISO>();
+  let repasadasHoy = 0;
+  for (const r of vigentes) {
+    const d = diaDe(r.repasado_en);
+    if (d === null) continue;
+    dias.add(d);
+    if (d === hoy) repasadasHoy++;
+  }
   // Si hoy todavía no repasó, la racha sigue viva desde ayer (no se corta hasta que termina el día).
   let dia = dias.has(hoy) ? hoy : sumarDias(hoy, -1);
   let racha = 0;

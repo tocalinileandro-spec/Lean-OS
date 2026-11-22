@@ -34,3 +34,9 @@ export function diaLogicoDeMs(ms: number, horaCambio: string = horaCambioActual,
   const g = (t: string) => partes.find((p) => p.type === t)!.value;
   return `${g("year")}-${g("month")}-${g("day")}`;
 }
+
+/** Día lógico de un instante ISO, o null si el instante no es válido (un registro dañado no debe romper la pantalla). */
+export function diaLogicoDeInstante(iso: string): FechaISO | null {
+  const ms = new Date(iso).getTime();
+  return Number.isNaN(ms) ? null : diaLogicoDeMs(ms);
+}

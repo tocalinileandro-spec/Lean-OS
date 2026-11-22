@@ -3,7 +3,7 @@
  * sobre el Almacén (`calificarYGuardar`, `deshacerCalificacion`, `construirCola`) con reloj inyectado.
  */
 import type { Almacen } from "./almacen.ts";
-import { diaLogico } from "./dia.ts";
+import { diaLogico, diaLogicoDeInstante } from "./dia.ts";
 import {
   EASE_MINIMO, INTERVALO_MAXIMO_DIAS, NUEVAS_POR_DIA,
   type Calificacion, type FechaISO, type Id, type Repaso, type Tarjeta,
@@ -128,7 +128,7 @@ export async function construirCola(almacen: Almacen, reloj: Reloj, opciones: Op
   }
   const nuevasHoy = tarjetas.filter((t) => {
     const p = primero.get(t.id);
-    return p !== undefined && diaLogico({ ahora: () => new Date(p) }) === hoy;
+    return p !== undefined && diaLogicoDeInstante(p) === hoy;
   }).length;
   const vencidas = tarjetas
     .filter((t) => !esNueva(t) && t.vence <= hoy)

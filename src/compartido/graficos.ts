@@ -3,7 +3,7 @@
  * el día lógico llega como parámetro (`hoy`), nunca se lee el reloj acá. Una sola pasada por colección.
  */
 import type { Almacen } from "./almacen.ts";
-import { diaLogico, diaLogicoDeMs } from "./dia.ts";
+import { diaLogico, diaLogicoDeInstante } from "./dia.ts";
 import type { Area, FechaISO, Repaso, Tarea, Tarjeta } from "./esquema.ts";
 import { totalesPorArea, type TotalPorArea } from "./estadisticas.ts";
 import { repasosVigentes, sumarDias } from "./repaso.ts";
@@ -21,7 +21,8 @@ export interface Retencion {
 }
 export interface PuntoSemana { inicio: FechaISO; fin: FechaISO; total: number }
 
-const diaDeInstante = (iso: string): FechaISO => diaLogicoDeMs(new Date(iso).getTime());
+/** Null si el instante es inválido: ese registro se saltea. */
+const diaDeInstante = (iso: string): FechaISO | null => diaLogicoDeInstante(iso);
 
 /** Calificaciones vigentes de cada uno de los últimos `dias` días lógicos (hasta `hoy`), en orden cronológico; cero si no hubo. */
 export function repasosPorDia(repasos: Repaso[], hoy: FechaISO, dias: number = DIAS_GRAFICO): PuntoDia[] {
@@ -33,7 +34,8 @@ export function repasosPorDia(repasos: Repaso[], hoy: FechaISO, dias: number = D
     indice.set(p.dia, p);
   }
   for (const r of repasosVigentes(repasos)) {
-    const p = indice.get(diaDeInstante(r.repasado_en));
+    const dia = diaDeInstante(r.repasado_en);
+    const p = dia === null ? undefined : indice.get(dia);
     if (p) p.total++;
   }
   return lista;
@@ -49,7 +51,7 @@ export function retencion(repasos: Repaso[], hoy: FechaISO, dias: number = DIAS_
   let total = 0;
   for (const r of repasosVigentes(repasos)) {
     const d = diaDeInstante(r.repasado_en);
-    if (d < desde || d > hoy) continue;
+    if (d === null || d < desde || d > hoy) continue;
     total++;
     if (r.calificacion === "bien" || r.calificacion === "facil") aciertos++;
   }
@@ -80,7 +82,8 @@ export function tareasHechasPorSemana(tareas: Tarea[], hoy: FechaISO, semanas: n
   }
   for (const t of tareas) {
     if (t.deleted_at !== null || t.estado !== "hecha" || !t.hecha_en) continue;
-    const p = indice.get(lunesDe(diaDeInstante(t.hecha_en)));
+    const dia = diaDeInstante(t.hecha_en);
+    const p = dia === null ? undefined : indice.get(lunesDe(dia));
     if (p) p.total++;
   }
   return lista;
