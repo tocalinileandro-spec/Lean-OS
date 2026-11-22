@@ -17,6 +17,7 @@ REPORTE.md
 datos/
 papelera/
 respaldos/
+datos-servidor/
 
 # Entorno de Python del prototipo
 .venv/
