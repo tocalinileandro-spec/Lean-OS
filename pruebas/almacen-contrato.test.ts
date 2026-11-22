@@ -70,6 +70,14 @@ describe.each(fabricas)("contrato del almacén: %s", (_n, crear) => {
     expect((await a.tarjetas.listar({ incluirBorrados: true })).map((t) => t.id)).toEqual(["2"]);
   });
 
+  it("guardarLote es todo o nada ante un registro inválido", async () => {
+    const a = await crear();
+    const malo = { ...tarjeta("2"), id: undefined } as unknown as Tarjeta;
+    await expect(a.guardarLote({ areas: [area("a1")], tarjetas: [tarjeta("1"), malo] })).rejects.toBeDefined();
+    expect(await a.areas.listar()).toHaveLength(0);
+    expect(await a.tarjetas.listar()).toHaveLength(0);
+  });
+
   it("guardarLote escribe varias tablas", async () => {
     const a = await crear();
     await a.guardarLote({ areas: [area("a1")], tarjetas: [tarjeta("1")] });

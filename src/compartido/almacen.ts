@@ -88,13 +88,17 @@ export class AlmacenMemoria implements Almacen {
   apuntes = new RepoMemoria<Apunte>();
   importaciones = new RepoMemoria<Importacion>();
   repasos = new RepasosMemoria();
-  /** Síncrono por dentro (sin esperas entre tablas), así que es atómico. */
+  /** Atómico: se clona y valida todo antes de escribir; si algo falla no se guarda nada. */
   async guardarLote(lote: Lote) {
-    await Promise.all([
-      this.areas.guardarVarios(lote.areas ?? []),
-      this.tarjetas.guardarVarios(lote.tarjetas ?? []),
-      this.apuntes.guardarVarios(lote.apuntes ?? []),
-      this.importaciones.guardarVarios(lote.importaciones ?? []),
-    ]);
+    const partes = [
+      [this.areas, structuredClone(lote.areas ?? [])],
+      [this.tarjetas, structuredClone(lote.tarjetas ?? [])],
+      [this.apuntes, structuredClone(lote.apuntes ?? [])],
+      [this.importaciones, structuredClone(lote.importaciones ?? [])],
+    ] as const;
+    for (const [, items] of partes) {
+      for (const x of items) if (typeof x.id !== "string" || !x.id) throw new Error("Registro sin id en el lote");
+    }
+    for (const [repo, items] of partes) await (repo as Repositorio<Registro>).guardarVarios(items);
   }
 }

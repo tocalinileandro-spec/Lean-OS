@@ -98,7 +98,7 @@ describe("estadísticas mínimas", () => {
     let e = await calcularEstadisticas(a, r);
     expect(e).toMatchObject({ pendientesHoy: 3, repasadasHoy: 0, racha: 0 });
     expect(e.porArea.find((x) => x.nombre === "CS50")!.total).toBe(3);
-    expect(e.porArea.find((x) => x.nombre === "Programación")!.total).toBe(0);
+    expect(e.porArea.find((x) => x.nombre === "Programación")!.total).toBe(3); // el Área suma sus subáreas
 
     await calificarYGuardar(a, r, ts[0]!.id, "bien");
     e = await calcularEstadisticas(a, r);

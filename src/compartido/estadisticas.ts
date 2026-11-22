@@ -18,7 +18,7 @@ export interface Estadisticas {
   repasadasHoy: number;
   /** Días lógicos seguidos con al menos un repaso vigente. */
   racha: number;
-  /** Tarjetas vivas por área o subárea directa (las áreas sin tarjetas figuran con 0). */
+  /** Tarjetas vivas por área (incluye las de sus subáreas) y por subárea (solo las suyas); sin tarjetas = 0. */
   porArea: TotalPorArea[];
 }
 
@@ -37,8 +37,13 @@ export async function calcularEstadisticas(almacen: Almacen, reloj: Reloj): Prom
     dia = sumarDias(dia, -1);
   }
   const tarjetas = await almacen.tarjetas.listar();
-  const porArea = (await almacen.areas.listar()).map((a) => ({
-    area_id: a.id, nombre: a.nombre, total: tarjetas.filter((t) => t.area_id === a.id).length,
+  const areas = await almacen.areas.listar();
+  const directas = new Map<Id, number>();
+  for (const t of tarjetas) directas.set(t.area_id, (directas.get(t.area_id) ?? 0) + 1);
+  // El Área suma las suyas (sin subárea) más las de sus subáreas; la subárea muestra solo las suyas.
+  const porArea = areas.map((a) => ({
+    area_id: a.id, nombre: a.nombre,
+    total: (directas.get(a.id) ?? 0) + areas.filter((h) => h.padre_id === a.id).reduce((n, h) => n + (directas.get(h.id) ?? 0), 0),
   }));
   return { pendientesHoy: (await construirCola(almacen, reloj)).length, repasadasHoy, racha, porArea };
 }
