@@ -14,7 +14,10 @@ export interface Migracion {
   aplicar: string | ((db: DatabaseSync) => void);
 }
 
-/** Migraciones del servidor. El esquema de sync llega con F4-b (se agrega como versión 2). */
+/** Tablas de datos del servidor (versión 2). Se repite acá a propósito: una migración nunca cambia después de publicada. */
+const TABLAS_V2 = ["tarjetas", "repasos", "areas", "metas", "tareas", "apuntes", "importaciones"];
+
+/** Migraciones del servidor. */
 export const MIGRACIONES: readonly Migracion[] = [
   {
     version: 1,
@@ -26,6 +29,36 @@ export const MIGRACIONES: readonly Migracion[] = [
         ultimo_uso INTEGER NOT NULL
       );
     `,
+  },
+  {
+    version: 2,
+    aplicar: (db) => {
+      for (const t of TABLAS_V2) {
+        const extra = t === "tarjetas" ? ", contenido_updated_at TEXT NOT NULL, repaso_updated_at TEXT NOT NULL" : "";
+        db.exec(`
+          CREATE TABLE ${t} (
+            id TEXT PRIMARY KEY,
+            rev INTEGER NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted_at TEXT${extra},
+            datos TEXT NOT NULL
+          );
+          CREATE INDEX ${t}_rev ON ${t} (rev);
+        `);
+      }
+      db.exec(`
+        CREATE TABLE contador_rev (id INTEGER PRIMARY KEY CHECK (id = 1), valor INTEGER NOT NULL);
+        INSERT INTO contador_rev (id, valor) VALUES (1, 0);
+        CREATE TABLE registro_sync (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tabla TEXT NOT NULL,
+          registro_id TEXT NOT NULL,
+          version_perdedora TEXT NOT NULL,
+          cuando TEXT NOT NULL,
+          motivo TEXT NOT NULL
+        );
+      `);
+    },
   },
 ];
 

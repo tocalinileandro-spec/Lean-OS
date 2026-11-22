@@ -136,7 +136,7 @@ describe("servidor: migraciones", () => {
     const rota = [
       ...MIGRACIONES,
       {
-        version: 2,
+        version: MIGRACIONES.length + 1, // la siguiente a las reales (antes era 2, hoy ya existe)
         aplicar: (db: DatabaseSync) => {
           db.exec("CREATE TABLE nueva (a INTEGER)");
           db.exec("DROP TABLE sesiones");
