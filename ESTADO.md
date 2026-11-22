@@ -20,3 +20,5 @@
 - **F3-a hecha (rama `tarea/F3-a`):** lógica de metas, tareas y apuntes sin UI (`tareas.ts`, `apuntes.ts`), almacén con metas/tareas, purga ampliada, S1 revalidado con tareas. Exigibles suman T1, T2, A1, A2. Falta F3-b: UI de Tareas y Apuntes y papelera con tareas/metas/apuntes.
 - **Para tu revisión:** hay vulnerabilidades reportadas por `npm install` en dependencias de desarrollo (sin `npm audit fix` hecho); la purga de papelera es solo local (decidir en fase 4 cómo se propaga); migraciones de IndexedDB con respaldo previo faltan cuando exista un esquema v2.
 - **Despliegue / secretos:** pendientes hasta la fase 4.
+
+- **F4-b hecha (rama `tarea/F4-b`):** sync del servidor (push idempotente con conflictos por grupo, pull paginado, borrado masivo S6), export, restauración (`npm run restaurar`), respaldo nocturno con retención de 30 y planificador. Exigibles suman S3, S4, S5, S6, G4. Falta F4-c: cliente de sync (S2, S7, estado de sync, exportar/importar en Ajustes), PWA y despliegue.

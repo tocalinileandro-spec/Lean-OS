@@ -7,12 +7,24 @@ import { RelojReal } from "../compartido/reloj.ts";
 import { crearApp } from "./app.ts";
 import { abrirBase } from "./base.ts";
 import { leerConfig } from "./config.ts";
+import { PlanificadorDiario, respaldarAhora } from "./respaldo.ts";
 
 try {
   const config = await leerConfig(process.env);
   const reloj = new RelojReal();
   const base = abrirBase(join(config.dataDir, "lean-os.sqlite"), reloj);
   const app = crearApp({ reloj, base, secretos: config.secretos });
+  const carpetaRespaldos = join(config.dataDir, "respaldos");
+  new PlanificadorDiario(
+    reloj,
+    () => {
+      respaldarAhora(base, carpetaRespaldos, reloj);
+      console.log("Respaldo nocturno escrito.");
+    },
+    undefined,
+    undefined,
+    (e) => console.error(`Falló el respaldo nocturno: ${e instanceof Error ? e.message : "error desconocido"}`),
+  ).iniciar();
   if (existsSync("dist")) {
     app.use("/*", serveStatic({ root: "./dist" }));
   }

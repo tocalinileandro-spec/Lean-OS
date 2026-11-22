@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import type { Context, MiddlewareHandler } from "hono";
 import { secureHeaders } from "hono/secure-headers";
+import { bodyLimit } from "hono/body-limit";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { argon2Verify } from "hash-wasm";
 import type { DatabaseSync } from "node:sqlite";
@@ -9,6 +10,8 @@ import type { Reloj } from "../compartido/reloj.ts";
 import type { Secretos } from "./config.ts";
 import { Limitador } from "./limitador.ts";
 import { Sesiones } from "./sesiones.ts";
+import { aplicarPush, LIMITE_PULL, LIMITE_PULL_MAXIMO, leerPull, validarPush } from "./sync.ts";
+import { exportarTodo } from "./respaldo.ts";
 
 export interface Dependencias {
   reloj: Reloj;
@@ -74,6 +77,10 @@ export function crearApp(deps: Dependencias): Hono {
 
   app.get("/health", (c) => c.text("ok"));
 
+  const demasiadoGrande = (c: Context) => c.json({ error: "El pedido es demasiado grande." }, 413);
+  app.post("/auth/login", bodyLimit({ maxSize: 1024, onError: demasiadoGrande }));
+  app.post("/sync/push", bodyLimit({ maxSize: 10 * 1024 * 1024, onError: demasiadoGrande }));
+
   app.post("/auth/login", async (c) => {
     const espera = limitador.intentar(ipDe(c));
     if (espera !== null) {
@@ -103,6 +110,33 @@ export function crearApp(deps: Dependencias): Hono {
   app.use("/auth/logout", exigirSesion);
   app.use("/sync/*", exigirSesion);
   app.use("/export", exigirSesion);
+
+  app.post("/sync/push", async (c) => {
+    let cuerpo: unknown;
+    try {
+      cuerpo = await c.req.json();
+    } catch {
+      return c.json({ error: "El cuerpo no es un JSON válido." }, 400);
+    }
+    const v = validarPush(cuerpo);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const r = aplicarPush(deps.base, deps.reloj, v.cambios, v.confirmar);
+    if (!r.ok) return c.json(r.pedido, 409);
+    return c.json(r.resultado);
+  });
+
+  app.get("/sync/pull", (c) => {
+    const since = Number(c.req.query("since") ?? 0);
+    const lim = Number(c.req.query("limite") ?? LIMITE_PULL);
+    if (!Number.isInteger(since) || since < 0) return c.json({ error: "since debe ser un entero desde 0." }, 400);
+    if (!Number.isInteger(lim) || lim < 1 || lim > LIMITE_PULL_MAXIMO) return c.json({ error: "limite fuera de rango." }, 400);
+    return c.json(leerPull(deps.base, since, lim));
+  });
+
+  app.get("/export", (c) => {
+    c.header("Cache-Control", "no-store");
+    return c.json(exportarTodo(deps.base, deps.reloj));
+  });
 
   app.get("/auth/yo", (c) => c.json({ ok: true }));
 

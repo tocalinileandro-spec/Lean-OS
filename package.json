@@ -13,6 +13,7 @@
     "build": "node build.ts",
     "verificar": "node verificar.ts",
     "servidor": "node src/servidor/main.ts",
+    "restaurar": "node scripts/restaurar.ts",
     "generar-secretos": "node scripts/generar-secretos.ts"
   },
   "devDependencies": {
