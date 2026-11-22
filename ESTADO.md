@@ -17,5 +17,6 @@
 - **Correr la app local:** `npm run build` y abrir `dist/index.html` en el navegador (los datos quedan en IndexedDB del navegador). Pantallas: Hoy, Repaso, Tarjetas (importar, papelera, editar/mover/suspender/borrar), Ajustes (nuevas por día, hora de cambio).
 - **Falta de la UI:** Tareas y Apuntes (fase 3); exportar/importar respaldo, estado de sync, cerrar sesión y PWA (fase 4). La papelera solo lista tarjetas.
 - **Próximo:** fase 3: metas, tareas, Hoy completa y apuntes (T1, T2, A1, A2; revalidar S1 con tareas).
+- **F3-a hecha (rama `tarea/F3-a`):** lógica de metas, tareas y apuntes sin UI (`tareas.ts`, `apuntes.ts`), almacén con metas/tareas, purga ampliada, S1 revalidado con tareas. Exigibles suman T1, T2, A1, A2. Falta F3-b: UI de Tareas y Apuntes y papelera con tareas/metas/apuntes.
 - **Para tu revisión:** hay vulnerabilidades reportadas por `npm install` en dependencias de desarrollo (sin `npm audit fix` hecho); la purga de papelera es solo local (decidir en fase 4 cómo se propaga); migraciones de IndexedDB con respaldo previo faltan cuando exista un esquema v2.
 - **Despliegue / secretos:** pendientes hasta la fase 4.

@@ -109,7 +109,6 @@ export class AlmacenIndexedDB implements Almacen {
   apuntes: Repositorio<Apunte>;
   importaciones: Repositorio<Importacion>;
   repasos: RepositorioRepasos;
-  /** Tablas de la fase 3: la store ya existe; la interfaz `Almacen` las incorporará con sus funciones. */
   metas: Repositorio<Meta>;
   tareas: Repositorio<Tarea>;
 
@@ -139,6 +138,7 @@ export class AlmacenIndexedDB implements Almacen {
     const partes: [string, { id: Id }[]][] = [
       ["areas", lote.areas ?? []], ["tarjetas", lote.tarjetas ?? []],
       ["apuntes", lote.apuntes ?? []], ["importaciones", lote.importaciones ?? []],
+      ["metas", lote.metas ?? []], ["tareas", lote.tareas ?? []],
     ];
     const tx = this.db.transaction([...partes.map(([t]) => t), CONTADOR], "readwrite");
     const fin = terminar(tx);
