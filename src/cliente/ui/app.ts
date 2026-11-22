@@ -82,6 +82,9 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   let errorCuenta = "";
   let informeRespaldo: InformeRespaldo | null = null;
   let cuentaDibujada = false;
+  interface EstadoExterno { activo: boolean; configurado: boolean; ultimo_resultado: { cuando: string; ok: boolean; mensaje: string } | null }
+  let externo: EstadoExterno | null = null;
+  let errorExterno = "";
   let versionVista = 0;
   let apunteEnEdicion: Id | null = null;
   let borradorTarjeta: { apunteId: Id; b: BorradorTarjeta } | null = null;
@@ -186,7 +189,10 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       else if (pantalla === "tareas") contenido.push(await dibujarTareas());
       else if (pantalla === "apuntes") contenido.push(await dibujarApuntes());
       else if (pantalla === "tarjetas") contenido.push(await dibujarTarjetas());
-      else contenido.push(dibujarAjustes());
+      else {
+        await cargarExterno();
+        contenido.push(dibujarAjustes());
+      }
     } catch (e) {
       contenido.push(h("p", { class: "aviso", role: "alert" }, mensajeDeError(e)));
     }
@@ -637,7 +643,65 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       h("p", { class: "suave" }, "A esa hora empieza el día nuevo para el repaso. Los cambios se guardan solos."),
       errorAjustes && h("p", { class: "aviso", role: "alert" }, errorAjustes),
       d.sync && dibujarCuenta(d.sync),
-      dibujarRespaldo());
+      dibujarRespaldo(),
+      d.sync && dibujarExterno(d.sync));
+  }
+
+  /** Consulta el estado del respaldo externo (solo con sesión). Sin conexión o error: se avisa y la pantalla sigue andando. */
+  async function cargarExterno(): Promise<void> {
+    const s = d.sync;
+    externo = null;
+    errorExterno = "";
+    if (!s || !s.pedirConSesion || !s.hayCuenta()) return;
+    try {
+      const r = await s.pedirConSesion("/ajustes/respaldo-externo");
+      if (!r.ok) throw new Error("estado");
+      externo = (await r.json()) as EstadoExterno;
+    } catch {
+      errorExterno = "No se pudo consultar el estado del respaldo externo (¿sin conexión?).";
+    }
+  }
+
+  function textoExterno(e: EstadoExterno): string {
+    if (!e.activo) return "Estado: desactivado.";
+    if (!e.configurado) return "Estado: falta configurar (faltan las claves en el servidor; ver SECRETOS.md).";
+    return "Estado: activo.";
+  }
+
+  function dibujarExterno(s: ControlSync): Node {
+    const aviso1 = h("p", { class: "suave" },
+      "Si lo activás, el servidor sube cada noche una copia CIFRADA de todos tus datos a tu bucket privado de Backblaze B2 (se conservan las últimas 30). Si está desactivado, no sale nada del servidor. Es opcional: la app funciona completa sin esto.");
+    if (!s.hayCuenta() || !s.pedirConSesion) {
+      return h("div", { class: "respaldo-externo" }, h("h2", {}, "Respaldo externo (opcional)"), aviso1,
+        h("p", { class: "suave", id: "externo-estado" }, "Iniciá sesión para configurarlo."));
+    }
+    const pedir = s.pedirConSesion.bind(s);
+    const cambiar = (activo: boolean) => accion(async () => {
+      const r = await pedir("/ajustes/respaldo-externo", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ activo }) });
+      if (!r.ok) throw new Error("No se pudo guardar el cambio.");
+    });
+    const ahora = () => accion(async () => {
+      const r = await pedir("/ajustes/respaldo-externo/probar", { method: "POST" });
+      if (!r.ok) throw new Error("No se pudo respaldar ahora: activá el respaldo externo primero.");
+      const x = (await r.json()) as { ok: boolean; mensaje: string };
+      aviso = x.mensaje;
+    });
+    if (!externo) {
+      return h("div", { class: "respaldo-externo" }, h("h2", {}, "Respaldo externo (opcional)"), aviso1,
+        h("p", { class: "aviso", role: "alert", id: "externo-estado" }, errorExterno || "No se pudo consultar el estado."));
+    }
+    const u = externo.ultimo_resultado;
+    const interruptor = h("input", { type: "checkbox", id: "externo-activo", checked: externo.activo }) as HTMLInputElement;
+    interruptor.checked = externo.activo;
+    interruptor.addEventListener("change", () => cambiar(interruptor.checked));
+    return h("div", { class: "respaldo-externo" },
+      h("h2", {}, "Respaldo externo (opcional)"),
+      aviso1,
+      h("label", {}, interruptor, " Subir una copia cifrada cada noche"),
+      h("p", { id: "externo-estado", role: "status" }, textoExterno(externo)),
+      u && h("p", { id: "externo-ultimo", class: u.ok ? "suave" : "aviso" }, `Último resultado (${formatearInstante(u.cuando)}): ${u.mensaje}`),
+      h("div", { class: "acciones" },
+        boton("Respaldar ahora", ahora, "principal chico", externo.activo ? {} : { disabled: true })));
   }
 
   function dibujarCuenta(s: ControlSync): Node {

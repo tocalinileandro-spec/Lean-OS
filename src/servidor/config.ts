@@ -9,11 +9,28 @@ export interface Secretos {
   sessionSecret: string;
 }
 
+/** Claves del respaldo externo opcional: solo hay respaldo si están las cuatro. */
+export interface ClavesRespaldo {
+  b2KeyId: string;
+  b2AppKey: string;
+  b2Bucket: string;
+  /** Clave de cifrado (RESPALDO_CLAVE). */
+  clave: string;
+}
+
+export function leerClavesRespaldo(env: Record<string, string | undefined>): ClavesRespaldo | null {
+  const b2KeyId = env["B2_KEY_ID"], b2AppKey = env["B2_APP_KEY"], b2Bucket = env["B2_BUCKET"], clave = env["RESPALDO_CLAVE"];
+  if (!b2KeyId || !b2AppKey || !b2Bucket || !clave) return null;
+  return { b2KeyId, b2AppKey, b2Bucket, clave };
+}
+
 export interface Config {
   puerto: number;
   dataDir: string;
   secretos: Secretos;
   produccion: boolean;
+  /** Ausente = respaldo externo sin configurar (no es un error). */
+  respaldoExterno: ClavesRespaldo | null;
 }
 
 export const CONTRASENA_DE_DESARROLLO = "desarrollo";
@@ -65,5 +82,6 @@ export async function leerConfig(
     dataDir: env["DATA_DIR"] || "./datos-servidor",
     secretos: { passwordHash: passwordHash as string, sessionSecret: sessionSecret as string },
     produccion,
+    respaldoExterno: leerClavesRespaldo(env),
   };
 }

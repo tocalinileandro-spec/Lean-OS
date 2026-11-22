@@ -1,7 +1,7 @@
 /** Lógica pura del service worker: qué pedidos puede servir la caché. Se prueba sin navegador. */
 
 /** Rutas de la API: nunca se cachean ni se sirven desde la caché. */
-export const PREFIJOS_API = ["/auth", "/sync", "/export", "/health"] as const;
+export const PREFIJOS_API = ["/auth", "/sync", "/export", "/ajustes", "/health"] as const;
 
 /** Archivos de la app que se precargan (rutas relativas al alcance del service worker). */
 export const ARCHIVOS_APP = ["./", "index.html", "app.js", "estilos.css", "manifest.webmanifest", "icono-192.png", "icono-512.png"] as const;

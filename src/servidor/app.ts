@@ -12,6 +12,7 @@ import { Limitador } from "./limitador.ts";
 import { Sesiones } from "./sesiones.ts";
 import { aplicarPush, LIMITE_PULL, LIMITE_PULL_MAXIMO, leerPull, validarPush } from "./sync.ts";
 import { exportarTodo } from "./respaldo.ts";
+import { ServicioRespaldoExterno } from "./respaldo-externo.ts";
 
 export interface Dependencias {
   reloj: Reloj;
@@ -19,6 +20,8 @@ export interface Dependencias {
   secretos: Secretos;
   /** Registro de eventos. Nunca recibe contraseñas, tokens ni contenido. */
   registrar?: (linea: string) => void;
+  /** Respaldo externo opcional. Si no se pasa, queda "sin configurar". */
+  respaldoExterno?: ServicioRespaldoExterno;
 }
 
 /** IP del cliente: Fly agrega Fly-Client-IP; si no, la del socket. No se confía en X-Forwarded-For (lo puede inventar el cliente). */
@@ -110,6 +113,32 @@ export function crearApp(deps: Dependencias): Hono {
   app.use("/auth/logout", exigirSesion);
   app.use("/sync/*", exigirSesion);
   app.use("/export", exigirSesion);
+  app.use("/ajustes/*", exigirSesion);
+  app.use("/ajustes/*", async (c, next) => {
+    await next();
+    c.res.headers.set("Cache-Control", "no-store");
+  });
+  const externo = deps.respaldoExterno ?? new ServicioRespaldoExterno({ db: deps.base, reloj: deps.reloj, claves: null, registrar });
+
+  app.get("/ajustes/respaldo-externo", (c) =>
+    c.json({ activo: externo.activo(), configurado: externo.configurado(), ultimo_resultado: externo.ultimoResultado() }));
+
+  app.put("/ajustes/respaldo-externo", bodyLimit({ maxSize: 1024, onError: demasiadoGrande }), async (c) => {
+    let activo: unknown;
+    try {
+      activo = ((await c.req.json()) as { activo?: unknown }).activo;
+    } catch {
+      return c.json({ error: "El cuerpo no es un JSON válido." }, 400);
+    }
+    if (typeof activo !== "boolean") return c.json({ error: "Falta activo (verdadero o falso)." }, 400);
+    externo.fijarActivo(activo);
+    return c.json({ activo, configurado: externo.configurado(), ultimo_resultado: externo.ultimoResultado() });
+  });
+
+  app.post("/ajustes/respaldo-externo/probar", async (c) => {
+    if (!externo.activo()) return c.json({ error: "Activá el respaldo externo antes de probarlo." }, 409);
+    return c.json(await externo.subirAhora());
+  });
 
   app.post("/sync/push", async (c) => {
     let cuerpo: unknown;

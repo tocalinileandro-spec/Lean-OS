@@ -1,4 +1,4 @@
-/** Arranca el servidor real. Uso: `npm run servidor`. Variables: PORT, DATA_DIR, APP_PASSWORD_HASH, SESSION_SECRET, NODE_ENV. */
+/** Arranca el servidor real. Uso: `npm run servidor`. Variables: PORT, DATA_DIR, APP_PASSWORD_HASH, SESSION_SECRET, NODE_ENV y, opcionales, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, RESPALDO_CLAVE. */
 import { serve } from "@hono/node-server";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -7,20 +7,19 @@ import { crearApp } from "./app.ts";
 import { abrirBase } from "./base.ts";
 import { leerConfig } from "./config.ts";
 import { montarEstaticos } from "./estaticos.ts";
-import { PlanificadorDiario, respaldarAhora } from "./respaldo.ts";
+import { PlanificadorDiario } from "./respaldo.ts";
+import { ServicioRespaldoExterno } from "./respaldo-externo.ts";
 
 try {
   const config = await leerConfig(process.env);
   const reloj = new RelojReal();
   const base = abrirBase(join(config.dataDir, "lean-os.sqlite"), reloj);
-  const app = crearApp({ reloj, base, secretos: config.secretos });
+  const respaldoExterno = new ServicioRespaldoExterno({ db: base, reloj, claves: config.respaldoExterno });
+  const app = crearApp({ reloj, base, secretos: config.secretos, respaldoExterno });
   const carpetaRespaldos = join(config.dataDir, "respaldos");
   new PlanificadorDiario(
     reloj,
-    () => {
-      respaldarAhora(base, carpetaRespaldos, reloj);
-      console.log("Respaldo nocturno escrito.");
-    },
+    () => { void respaldoExterno.nocturno(carpetaRespaldos); },
     undefined,
     undefined,
     (e) => console.error(`Falló el respaldo nocturno: ${e instanceof Error ? e.message : "error desconocido"}`),
