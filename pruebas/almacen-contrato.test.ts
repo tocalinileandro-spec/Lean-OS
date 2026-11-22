@@ -3,7 +3,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { describe, expect, it } from "vitest";
 import { AlmacenMemoria, type Almacen } from "../src/compartido/almacen.ts";
 import { AlmacenIndexedDB } from "../src/cliente/almacen-indexeddb.ts";
-import type { Area, Repaso, Tarjeta } from "../src/compartido/esquema.ts";
+import type { Area, Meta, Repaso, Tarea, Tarjeta } from "../src/compartido/esquema.ts";
 
 const T0 = "2026-11-22T15:00:00.000Z";
 const base = { created_at: T0, updated_at: T0, deleted_at: null, rev: null };
@@ -14,6 +14,13 @@ const tarjeta = (id: string, extra: Partial<Tarjeta> = {}): Tarjeta => ({
 const area = (id: string): Area => ({ ...base, id, nombre: id, nombre_normalizado: id, padre_id: null });
 const repaso = (id: string, tarjeta_id: string): Repaso => ({
   ...base, id, tarjeta_id, calificacion: "bien", repasado_en: T0, ease_antes: 2.5, ease_despues: 2.5, intervalo_antes: 0, intervalo_despues: 1,
+});
+
+const meta = (id: string, extra: Partial<Meta> = {}): Meta => ({
+  ...base, id, tipo: "anual", anio: 2026, trimestre: null, titulo: `m${id}`, estado: "activa", padre_id: null, ...extra,
+});
+const tarea = (id: string, extra: Partial<Tarea> = {}): Tarea => ({
+  ...base, id, titulo: `t${id}`, fecha: null, meta_id: null, nota: null, estado: "pendiente", hecha_en: null, ...extra,
 });
 
 const fabricas: [string, () => Promise<Almacen>][] = [
@@ -83,6 +90,31 @@ describe.each(fabricas)("contrato del almacén: %s", (_n, crear) => {
     await a.guardarLote({ areas: [area("a1")], tarjetas: [tarjeta("1")] });
     expect(await a.areas.listar()).toHaveLength(1);
     expect(await a.tarjetas.listar()).toHaveLength(1);
+  });
+});
+
+describe.each(fabricas)("contrato de metas y tareas: %s", (_n, crear) => {
+  it("metas y tareas: orden de inserción, borrados ocultos, copias y eliminación definitiva", async () => {
+    const a = await crear();
+    await a.metas.guardarVarios([meta("z"), meta("b", { deleted_at: T0 })]);
+    await a.tareas.guardarVarios([tarea("q"), tarea("c"), tarea("d", { deleted_at: T0 })]);
+    expect((await a.metas.listar()).map((m) => m.id)).toEqual(["z"]);
+    expect(await a.metas.listar({ incluirBorrados: true })).toHaveLength(2);
+    expect((await a.tareas.listar()).map((t) => t.id)).toEqual(["q", "c"]);
+    (await a.tareas.obtener("q"))!.titulo = "mutada";
+    expect((await a.tareas.obtener("q"))!.titulo).toBe("tq");
+    await a.tareas.eliminarDefinitivo(["q", "nada"]);
+    expect((await a.tareas.listar({ incluirBorrados: true })).map((t) => t.id)).toEqual(["c", "d"]);
+  });
+
+  it("guardarLote escribe metas y tareas, y es todo o nada", async () => {
+    const a = await crear();
+    await a.guardarLote({ metas: [meta("1")], tareas: [tarea("1")] });
+    expect(await a.metas.listar()).toHaveLength(1);
+    expect(await a.tareas.listar()).toHaveLength(1);
+    const malo = { ...tarea("3"), id: undefined } as unknown as Tarea;
+    await expect(a.guardarLote({ metas: [meta("2")], tareas: [malo] })).rejects.toBeDefined();
+    expect(await a.metas.listar()).toHaveLength(1);
   });
 });
 

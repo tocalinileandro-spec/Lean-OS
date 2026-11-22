@@ -2,7 +2,7 @@
  * Almacén (repositorio) asíncrono. Cada método es una operación atómica (una transacción en
  * IndexedDB), así que la implementación real es directa. La de memoria sirve para pruebas.
  */
-import type { Apunte, Area, Id, Importacion, Registro, Repaso, Tarjeta } from "./esquema.ts";
+import type { Apunte, Area, Id, Importacion, Meta, Registro, Repaso, Tarea, Tarjeta } from "./esquema.ts";
 
 export interface OpcionesListar {
   /** Por defecto los borrados (papelera) no se devuelven. */
@@ -34,6 +34,8 @@ export interface Lote {
   tarjetas?: Tarjeta[];
   apuntes?: Apunte[];
   importaciones?: Importacion[];
+  metas?: Meta[];
+  tareas?: Tarea[];
 }
 
 export interface Almacen {
@@ -41,6 +43,8 @@ export interface Almacen {
   areas: Repositorio<Area>;
   apuntes: Repositorio<Apunte>;
   importaciones: Repositorio<Importacion>;
+  metas: Repositorio<Meta>;
+  tareas: Repositorio<Tarea>;
   repasos: RepositorioRepasos;
   /** Guarda varias tablas en una sola transacción (todo o nada). */
   guardarLote(lote: Lote): Promise<void>;
@@ -87,6 +91,8 @@ export class AlmacenMemoria implements Almacen {
   areas = new RepoMemoria<Area>();
   apuntes = new RepoMemoria<Apunte>();
   importaciones = new RepoMemoria<Importacion>();
+  metas = new RepoMemoria<Meta>();
+  tareas = new RepoMemoria<Tarea>();
   repasos = new RepasosMemoria();
   /** Atómico: se clona y valida todo antes de escribir; si algo falla no se guarda nada. */
   async guardarLote(lote: Lote) {
@@ -95,6 +101,8 @@ export class AlmacenMemoria implements Almacen {
       [this.tarjetas, structuredClone(lote.tarjetas ?? [])],
       [this.apuntes, structuredClone(lote.apuntes ?? [])],
       [this.importaciones, structuredClone(lote.importaciones ?? [])],
+      [this.metas, structuredClone(lote.metas ?? [])],
+      [this.tareas, structuredClone(lote.tareas ?? [])],
     ] as const;
     for (const [, items] of partes) {
       for (const x of items) if (typeof x.id !== "string" || !x.id) throw new Error("Registro sin id en el lote");

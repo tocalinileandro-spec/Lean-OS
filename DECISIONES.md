@@ -78,3 +78,17 @@ Formato: fecha, qué se eligió, por qué.
 - **Cambios en documentos:** CLAUDE.md, secciones 1, 7 y 9 de docs/VISION.md y `.claude/agents/programador.md`. En la sección 1 se agregó la excepción expresa para respaldo externo y audio (vienen desactivados; solo funcionan si el dueño los activa en Ajustes y carga su clave; la app funciona completa sin ellos) y se sacaron del "fuera de alcance" audio, recurrentes y gráficos, que pasan a opcionales con criterios O* propios.
 - **Alcance de esta etapa:** fases 3, 4 y 5 más los opcionales (gráficos, recurrentes, respaldo externo, audio). El PR #1 (fases 1 y 2) ya estaba fusionado en `main` al empezar.
 - **B1 (ruta):** la prueba ahora lee `.github/workflows/ci.yml` (antes `ci/ci.yml`) porque el workflow se movió por la regla nueva; los chequeos de contenido no cambian.
+
+## 2026-11-22 (fase 3, F3-a: lógica de metas, tareas y apuntes)
+
+- **Almacén:** `Almacen` y `Lote` incorporan `metas` y `tareas` (memoria e IndexedDB); la batería de contrato las cubre. `listarPapelera` devuelve también metas y tareas; `purgarPapelera` las purga con los mismos 30 días.
+- **Módulos:** `src/compartido/tareas.ts` (metas, tareas, Hoy, Bandeja, progreso) y `src/compartido/apuntes.ts`. Borrar/restaurar apuntes sigue en `gestion.ts`.
+- **Borrar meta:** un solo `guardarLote` (meta borrada, tareas con `meta_id` null, trimestrales hijas con `padre_id` null), atómico. Restaurar una meta NO vuelve a vincular tareas ni hijas (no se guarda el vínculo anterior; es lo más simple y no pierde datos).
+- **Progreso:** hechas/vinculadas sobre tareas vivas; la anual suma las de sus trimestrales vivas; sin tareas = 0; porcentaje redondeado.
+- **Hoy:** `atrasadas` = pendientes con fecha < hoy (más vieja primero); `hoy` = tareas con fecha de hoy, pendientes y hechas (las hechas se incluyen para poder desmarcar; T1 exige que Hoy la muestre ya hecha); `tarjetasARepasar` = largo de `construirCola`. Bandeja = pendientes sin fecha. Todo con `diaLogico`.
+- **Validaciones:** título vacío rechazado; fecha debe ser AAAA-MM-DD; meta/área referenciada debe existir y estar viva; marcar hecha una ya hecha no cambia `hecha_en`.
+- **Título derivado del apunte:** NO se guarda; `titulo` queda null y `tituloApunte()` lo calcula al mostrar (primeros 60 caracteres, espacios colapsados). Así sigue al texto si se edita y no se confunde con uno escrito a mano. A1 verifica `tituloApunte`.
+- **Etiquetas:** se recortan y se descartan vacías y repetidas (comparando normalizado), conservando la primera escritura.
+- **Búsqueda:** todas las palabras (normalizadas, por subcadena) deben estar en título + texto + etiquetas; filtros de tipo, etiqueta (normalizada, exacta) y área; resultados del más nuevo al más viejo.
+- **Convertir a tarea:** título = título mostrado del apunte; nota = texto completo si difiere del título. El apunte no se borra ni se toca. **A tarjeta:** borrador `{pregunta: título mostrado, respuesta: texto, pista: null, area_id}`; no guarda nada.
+- **S1 ampliado** (sin relajar lo existente) con metas, tareas (incluida una borrada), apuntes y captura. **IDS_EXIGIBLES** suma T1, T2, A1, A2.

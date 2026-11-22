@@ -4,7 +4,7 @@
  * `contenido_updated_at`; el estado de repaso no se toca acá.
  */
 import type { Almacen } from "./almacen.ts";
-import { DIAS_PAPELERA, type Apunte, type Id, type Tarjeta } from "./esquema.ts";
+import { DIAS_PAPELERA, type Apunte, type Id, type Meta, type Tarea, type Tarjeta } from "./esquema.ts";
 import type { Reloj } from "./reloj.ts";
 
 export interface CambiosTarjeta {
@@ -64,14 +64,18 @@ export async function borrarApunte(almacen: Almacen, reloj: Reloj, id: Id): Prom
 export interface Papelera {
   tarjetas: Tarjeta[];
   apuntes: Apunte[];
+  metas: Meta[];
+  tareas: Tarea[];
 }
 
-/** Lo borrado y todavía no purgado. (Tareas y metas se suman en la fase 3.) */
+/** Lo borrado y todavía no purgado. */
 export async function listarPapelera(almacen: Almacen): Promise<Papelera> {
   const borrado = <T extends { deleted_at: string | null }>(x: T) => x.deleted_at !== null;
   return {
     tarjetas: (await almacen.tarjetas.listar({ incluirBorrados: true })).filter(borrado),
     apuntes: (await almacen.apuntes.listar({ incluirBorrados: true })).filter(borrado),
+    metas: (await almacen.metas.listar({ incluirBorrados: true })).filter(borrado),
+    tareas: (await almacen.tareas.listar({ incluirBorrados: true })).filter(borrado),
   };
 }
 
@@ -100,7 +104,7 @@ export async function purgarPapelera(almacen: Almacen, reloj: Reloj): Promise<nu
   const limite = reloj.ahora().getTime() - DIAS_PAPELERA * 86_400_000;
   const vencido = (x: { deleted_at: string | null }) => x.deleted_at !== null && new Date(x.deleted_at).getTime() <= limite;
   let total = 0;
-  for (const repo of [almacen.tarjetas, almacen.apuntes, almacen.importaciones]) {
+  for (const repo of [almacen.tarjetas, almacen.apuntes, almacen.importaciones, almacen.metas, almacen.tareas]) {
     const ids = (await repo.listar({ incluirBorrados: true })).filter(vencido).map((x) => x.id);
     await repo.eliminarDefinitivo(ids);
     total += ids.length;
