@@ -92,7 +92,7 @@ describe("sync: push, pull, conflictos", () => {
     await m.push([c("tareas", tarea("t1"))]);
     const cliA = tarea("t1", { titulo: "desde A", updated_at: mas(10) });
     const cliB = tarea("t1", { titulo: "desde B", updated_at: mas(5) });
-    expect((await m.push([c("tareas", cliA)])).cuerpo.conflictos).toEqual([]); // pisa la original sin editar: no es conflicto
+    expect((await m.push([c("tareas", cliA)])).cuerpo.conflictos).toHaveLength(1); // la versión anterior del servidor queda guardada
     const r = await m.push([c("tareas", cliB)]); // B llega tarde y es más vieja
     expect(r.cuerpo.conflictos).toEqual([expect.objectContaining({ tabla: "tareas", id: "t1" })]);
     const t = (await m.pull()).cuerpo.tareas[0];
@@ -118,14 +118,39 @@ describe("sync: push, pull, conflictos", () => {
     const repaso = tarjeta("k1", { ease: 2.1, intervalo: 3, reps: 1, vence: "2026-03-13", repaso_updated_at: mas(6), updated_at: mas(6) });
     await m.push([c("tarjetas", contenido)]);
     const r = await m.push([c("tarjetas", repaso)]);
-    expect(r.cuerpo.conflictos).toEqual([]);
+    // cada cliente mandó el otro grupo con su contenido viejo: ese perdedor queda registrado, no se pierde
+    expect(r.cuerpo.conflictos.map((x: any) => x.motivo).join()).toContain("contenido");
     const k = (await m.pull()).cuerpo.tarjetas[0];
     expect(k).toMatchObject({ pregunta: "editada", ease: 2.1, intervalo: 3, vence: "2026-03-13", contenido_updated_at: mas(5), repaso_updated_at: mas(6) });
     // un repaso más viejo no pisa al más nuevo y queda registrado
     const viejo = tarjeta("k1", { ease: 1.3, repaso_updated_at: mas(1) });
     const r2 = await m.push([c("tarjetas", viejo)]);
-    expect(r2.cuerpo.conflictos).toHaveLength(1);
+    expect(r2.cuerpo.conflictos.map((x: any) => x.motivo).join()).toContain("repaso");
     expect((await m.pull()).cuerpo.tarjetas[0].ease).toBe(2.1);
+  });
+
+  it("el perdedor siempre queda registrado si difiere, aunque su marca sea igual a created_at; sin created_at se rechaza; idéntico no es conflicto", async () => {
+    const m = await montar();
+    await m.push([c("tareas", tarea("t1", { titulo: "A", updated_at: mas(2) }))]);
+    const r = await m.push([c("tareas", tarea("t1", { titulo: "B" }))]); // updated_at == created_at, más vieja
+    expect(r.cuerpo.conflictos).toHaveLength(1);
+    expect((await m.push([c("tareas", tarea("t1", { titulo: "A", updated_at: mas(2) }))])).cuerpo.conflictos).toEqual([]);
+    const sin: any = tarea("t2");
+    delete sin.created_at;
+    expect((await m.push([c("tareas", sin)])).status).toBe(400);
+    expect(m.db.prepare("SELECT COUNT(*) AS n FROM registro_sync").get()).toEqual({ n: 1 });
+  });
+
+  it("un repaso repetido con contenido distinto queda en registro_sync; idéntico se ignora", async () => {
+    const m = await montar();
+    const rep = (extra: object = {}) => c("repasos", { id: "r1", created_at: T0, updated_at: T0, deleted_at: null, rev: null, tarjeta_id: "k1", calificacion: "bien", repasado_en: T0, ease_antes: 2.5, ease_despues: 2.5, intervalo_antes: 0, intervalo_despues: 1, ...extra });
+    await m.push([rep()]);
+    expect((await m.push([rep()])).cuerpo.conflictos).toEqual([]);
+    const r = await m.push([rep({ calificacion: "facil" })]);
+    expect(r.cuerpo).toMatchObject({ aceptados: 0, conflictos: [expect.objectContaining({ tabla: "repasos", id: "r1" })] });
+    expect((await m.pull()).cuerpo.repasos[0].calificacion).toBe("bien");
+    const p = m.db.prepare("SELECT version_perdedora FROM registro_sync WHERE tabla = 'repasos'").all() as { version_perdedora: string }[];
+    expect(JSON.parse(p[0]!.version_perdedora).calificacion).toBe("facil");
   });
 
   it("una marca con más de 5 minutos de futuro se trata como ahora; hasta 5 minutos se respeta", async () => {

@@ -58,6 +58,7 @@ const esObjeto = (v: unknown): v is Fila => typeof v === "object" && v !== null 
 export function validarRegistro(tabla: Tabla, r: unknown, exigirRev = false): string | null {
   if (!esObjeto(r)) return "no es un objeto";
   if (typeof r["id"] !== "string" || r["id"] === "" || r["id"].length > 100) return "falta un id válido";
+  if (!esFecha(r["created_at"])) return "falta created_at válido";
   if (!esFecha(r["updated_at"])) return "falta updated_at válido";
   if (r["deleted_at"] != null && !esFecha(r["deleted_at"])) return "deleted_at inválido";
   if (tabla === "tarjetas") {
@@ -173,9 +174,8 @@ class Aplicador {
     return c;
   }
 
-  /** Una versión sin ediciones (marca igual a created_at) que pierde es solo una copia vieja, no un conflicto real. */
-  private perdio(tabla: Tabla, id: string, version: unknown, motivo: string, marca: unknown, creado: unknown): void {
-    if (!(ms(marca) > ms(creado))) return;
+  /** Toda versión perdedora distinta de la ganadora queda guardada (el llamador ya comprobó que difiere). */
+  private perdio(tabla: Tabla, id: string, version: unknown, motivo: string): void {
     this.db
       .prepare("INSERT INTO registro_sync (tabla, registro_id, version_perdedora, cuando, motivo) VALUES (?, ?, ?, ?, ?)")
       .run(tabla, id, JSON.stringify(version), new Date(this.ahoraMs).toISOString(), motivo);
@@ -192,15 +192,19 @@ class Aplicador {
     const id = n["id"] as string;
     const e = leer(this.db, tabla, id);
     if (!e) return this.escribir(tabla, n);
-    if (tabla === "repasos") return; // solo se agregan: reenviar no cambia nada
+    if (tabla === "repasos") {
+      // Solo se agregan: idéntico = reenvío (se ignora); distinto = se conserva el del servidor y el otro queda registrado.
+      if (estable(sinMarcas(e)) !== estable(sinMarcas(n))) this.perdio(tabla, id, n, "repaso repetido con contenido distinto; se conservó el del servidor");
+      return;
+    }
     if (tabla === "tarjetas") return this.fusionarTarjeta(e, n);
 
     if (estable(sinMarcas(e)) === estable(sinMarcas(n))) return; // mismo contenido: reenvío
     if (ms(n["updated_at"]) > ms(e["updated_at"])) {
-      this.perdio(tabla, id, e, "ganó la edición más reciente; se guardó la versión anterior del servidor", e["updated_at"], e["created_at"]);
+      this.perdio(tabla, id, e, "ganó la edición más reciente; se guardó la versión anterior del servidor");
       this.escribir(tabla, n);
     } else {
-      this.perdio(tabla, id, n, "se conservó la versión del servidor (más reciente o empate)", n["updated_at"], n["created_at"]);
+      this.perdio(tabla, id, n, "se conservó la versión del servidor (más reciente o empate)");
     }
   }
 
@@ -211,12 +215,12 @@ class Aplicador {
       if (iguales(e, n, g.campos)) continue; // mismo contenido: nada que fusionar
       const grupo = (x: Fila) => ({ grupo: g.nombre, [g.marca]: x[g.marca], ...Object.fromEntries(g.campos.map((k) => [k, x[k] ?? null])) });
       if (ms(n[g.marca]) > ms(e[g.marca])) {
-        this.perdio("tarjetas", e["id"] as string, grupo(e), `ganó el grupo ${g.nombre} más reciente; se guardó el anterior del servidor`, e[g.marca], e["created_at"]);
+        this.perdio("tarjetas", e["id"] as string, grupo(e), `ganó el grupo ${g.nombre} más reciente; se guardó el anterior del servidor`);
         for (const k of g.campos) r[k] = n[k] ?? null;
         r[g.marca] = n[g.marca];
         cambio = true;
       } else {
-        this.perdio("tarjetas", e["id"] as string, grupo(n), `se conservó el grupo ${g.nombre} del servidor (más reciente o empate)`, n[g.marca], e["created_at"]);
+        this.perdio("tarjetas", e["id"] as string, grupo(n), `se conservó el grupo ${g.nombre} del servidor (más reciente o empate)`);
       }
     }
     if (!cambio) return;
