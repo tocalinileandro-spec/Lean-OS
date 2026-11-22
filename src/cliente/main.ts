@@ -31,4 +31,16 @@ async function arrancar(): Promise<void> {
   }
 }
 
+/** Registra el service worker solo en https o localhost; si falla, la app sigue funcionando igual. */
+function registrarServiceWorker(): void {
+  try {
+    const seguro = location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1";
+    if (!seguro || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("sw.js").catch(() => undefined);
+  } catch {
+    // Sin service worker no se puede abrir sin conexión, pero todo lo demás funciona.
+  }
+}
+
 void arrancar();
+registrarServiceWorker();
