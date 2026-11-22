@@ -4,8 +4,8 @@
 
 ## Control de sesión (presupuesto de 20 h)
 
-- **Sesión activa:** ninguna. Cerrada el 2026-11-22 23:52 UTC.
-- **Horas trabajadas en esta sesión:** inicio 2026-11-22 21:54:43 UTC, cierre 23:52 UTC, unas 1,9 h.
+- **Sesión activa:** ninguna. Cerrada el 2026-11-22 23:49 UTC.
+- **Horas trabajadas en esta sesión:** inicio 2026-11-22 21:54:43 UTC, cierre 23:49 UTC, unas 1,9 h.
 - **Total acumulado:** 1,9 h de 20 h.
 - Si otra sesión lee esto: dice COMPLETO, no hay nada que hacer.
 
