@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block titulo %}Repaso · Lean OS{% endblock %}
+
+{% block contenido %}
+<h1>Repaso</h1>
+
+{# Selector: todo lo de hoy, o un área en particular #}
+<nav class="selector" aria-label="Qué repasar">
+  <a href="{{ url_for('ver_repaso') }}" {% if not filtro %}aria-current="true"{% endif %}>Todo lo de hoy</a>
+  {% for t in tarjetas %}
+    <a href="{{ url_for('ver_repaso', area=t.slug) }}" {% if filtro == t.slug %}aria-current="true"{% endif %}>
+      {{ t.nombre }}{% if t.cantidad_pendientes %} · {{ t.cantidad_pendientes }}{% endif %}
+    </a>
+  {% endfor %}
+</nav>
+
+{% if item %}
+  <p class="suave progreso" aria-live="polite">
+    {{ quedan }} pregunta{{ '' if quedan == 1 else 's' }} para hoy
+  </p>
+
+  <article class="tarjeta tarjeta-repaso" id="tarjeta-repaso">
+    <p class="contexto">{{ item.area_nombre }} · {{ item.tema.tema }}</p>
+    <h2 class="pregunta">{{ item.pregunta.p }}</h2>
+
+    {% if item.pregunta.pista %}
+      <div class="bloque-pista">
+        <button type="button" class="boton boton-suave boton-chico" id="boton-pista" aria-expanded="false" aria-controls="texto-pista">Ver pista</button>
+        <p id="texto-pista" class="pista" hidden>{{ item.pregunta.pista }}</p>
+      </div>
+    {% endif %}
+
+    <p class="indicacion" id="indicacion">Pensá la respuesta y después tocá "Ver respuesta".</p>
+    <button type="button" class="boton boton-grande" id="boton-respuesta" aria-controls="zona-respuesta" autofocus>Ver respuesta</button>
+
+    <div id="zona-respuesta" hidden>
+      <div class="respuesta" tabindex="-1" id="texto-respuesta">
+        <span class="etiqueta">Respuesta</span>
+        <p class="texto-largo">{{ item.pregunta.r }}</p>
+      </div>
+
+      <form method="post" action="{{ url_for('responder_repaso') }}" class="botones-respuesta">
+        <input type="hidden" name="area_slug" value="{{ item.area_slug }}">
+        <input type="hidden" name="id_pregunta" value="{{ item.pregunta.id }}">
+        <input type="hidden" name="filtro" value="{{ filtro }}">
+        <button class="boton boton-suave boton-grande" type="submit" name="me_acorde" value="no">No me acordé</button>
+        <button class="boton boton-grande" type="submit" name="me_acorde" value="si" id="boton-si">Me acordé</button>
+      </form>
+    </div>
+
+    <button type="button" class="enlace" id="boton-resumen">Ver el resumen del tema</button>
+  </article>
+
+  <dialog id="dialogo-resumen" aria-labelledby="titulo-resumen">
+    <h2 id="titulo-resumen">{{ item.tema.tema }}</h2>
+    <p class="suave">{{ item.area_nombre }} · {{ item.tema.fecha | fecha_corta }}</p>
+    <p class="texto-largo">{{ item.tema.resumen }}</p>
+    <div class="acciones">
+      <button type="button" class="boton" id="cerrar-resumen">Cerrar</button>
+    </div>
+  </dialog>
+{% else %}
+  <div class="vacio">
+    <div class="check" aria-hidden="true">✓</div>
+    <h2>No hay nada para repasar{{ ' en esta área' if filtro else ' hoy' }}</h2>
+    {% if proxima_fecha %}
+      <p>Lo próximo toca el {{ proxima_fecha.isoformat() | fecha_corta }}.</p>
+    {% else %}
+      <p>Cuando importes tu primer aprendizaje, sus preguntas van a aparecer acá.</p>
+    {% endif %}
+    <div class="acciones acciones-centro">
+      <a class="boton" href="{{ url_for('pagina_importar') }}">Importar aprendizaje</a>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if item %}<script src="{{ url_for('static', filename='repaso.js') }}"></script>{% endif %}
+{% endblock %}

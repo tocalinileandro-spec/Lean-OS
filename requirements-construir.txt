@@ -1,0 +1,3 @@
+# Solo hace falta para armar el .exe (construir_exe.bat). Para usar la app no se necesita.
+-r requirements.txt
+pyinstaller

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}Confirmar importación · Lean OS{% endblock %}
+
+{% block contenido %}
+<h1>Esto es lo que voy a guardar</h1>
+
+{% if revision.duplicado %}
+  <div class="aviso aviso-info" role="status">
+    <strong>Este bloque ya lo importaste antes.</strong>
+    Tiene exactamente el mismo contenido, así que no lo voy a guardar de nuevo.
+  </div>
+{% endif %}
+
+<section class="tarjeta">
+  <h2>{{ revision.vista.titulo }}</h2>
+  <ul class="datos">
+    {% for linea in revision.vista.lineas %}<li>{{ linea }}</li>{% endfor %}
+  </ul>
+
+  {% if revision.vista.texto %}
+    <h3>Resumen</h3>
+    <p class="texto-largo">{{ revision.vista.texto }}</p>
+  {% endif %}
+
+  {% if revision.vista.elementos %}
+    <h3>{{ revision.vista.elementos_titulo }}</h3>
+    <ol class="preguntas">
+      {% for elemento in revision.vista.elementos %}<li>{{ elemento }}</li>{% endfor %}
+    </ol>
+  {% endif %}
+</section>
+
+<form method="post" action="{{ url_for('confirmar_importacion') }}" class="acciones">
+  {# Mandamos el mismo texto de vuelta; el motor lo valida otra vez antes de guardar #}
+  <input type="hidden" name="texto" value="{{ texto }}">
+  {% if not revision.duplicado %}
+    <button class="boton" type="submit">Confirmar y guardar</button>
+  {% endif %}
+  <a class="boton boton-suave" href="{{ url_for('pagina_importar') }}">{{ 'Volver' if revision.duplicado else 'Cancelar' }}</a>
+</form>
+{% endblock %}

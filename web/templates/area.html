@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block titulo %}{{ area.nombre }} · Lean OS{% endblock %}
+
+{% block contenido %}
+{# El "camino": Todas las áreas › Programación › (esta área) #}
+<p class="migas">
+  <a href="{{ url_for('ver_areas') }}">← Todas las áreas</a>
+  {% for ancestro in ancestros %}
+    › <a href="{{ url_for('ver_area', slug=ancestro.slug) }}">{{ ancestro.nombre.split(' > ')[-1] }}</a>
+  {% endfor %}
+</p>
+
+<div class="encabezado">
+  <h1>{{ titulo }}</h1>
+  {% if pendientes %}
+    <a class="boton" href="{{ url_for('ver_repaso', area=area.slug) }}">Repasar esta área · {{ pendientes }}</a>
+  {% else %}
+    <span class="etiqueta etiqueta-calma">Todo al día</span>
+  {% endif %}
+</div>
+
+{% if error %}
+  <div class="aviso aviso-error" role="alert">{{ error }}</div>
+{% endif %}
+
+{% if tema_movido and area_de_destino %}
+  <div class="aviso aviso-info" role="status">
+    El tema <strong>{{ tema_movido }}</strong> se movió a
+    <a href="{{ url_for('ver_area', slug=area_de_destino.slug) }}">{{ area_de_destino.nombre }}</a>.
+  </div>
+{% endif %}
+
+{% if tema_eliminado %}
+  <div class="aviso aviso-info" role="status">
+    El tema <strong>{{ tema_eliminado }}</strong> se eliminó. Quedó una copia en la carpeta <code>papelera</code> de tus datos.
+  </div>
+{% endif %}
+
+<section aria-labelledby="titulo-subareas" class="seccion">
+  <h2 id="titulo-subareas" class="titulo-seccion">Subáreas</h2>
+  {% if subareas %}
+    <ul class="grilla">
+      {% for t in subareas %}
+        <li>{% include "_tarjeta_area.html" %}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <form class="nueva-area" method="post" action="{{ url_for('crear_subarea', slug=area.slug) }}">
+    <label for="nombre-subarea" class="solo-lector">Nombre de la nueva subárea</label>
+    <input id="nombre-subarea" name="nombre" type="text" maxlength="60" required
+           placeholder="Nueva subárea de {{ titulo }}" value="{{ nombre_nuevo or '' }}">
+    <button class="boton" type="submit">Crear subárea</button>
+  </form>
+</section>
+
+{% if temas %}
+  <section aria-labelledby="titulo-temas" class="seccion">
+    <h2 id="titulo-temas" class="titulo-seccion">Temas</h2>
+    <ul class="lista-temas">
+      {% for tema in temas %}
+        <li class="tarjeta">
+          <div class="tema-cabecera">
+            <h2>{{ tema.tema }}</h2>
+            <time class="suave" datetime="{{ tema.fecha }}">{{ tema.fecha | fecha_corta }}</time>
+          </div>
+          <p class="texto-largo">{{ tema.resumen }}</p>
+
+          <details class="desplegable">
+            <summary>Ver las {{ tema.preguntas | length }} pregunta{{ '' if tema.preguntas | length == 1 else 's' }}</summary>
+            <ol class="preguntas">
+              {% for p in tema.preguntas %}
+                <li>
+                  <strong>{{ p.p }}</strong>
+                  <span class="suave">{{ p.r }}</span>
+                </li>
+              {% endfor %}
+            </ol>
+          </details>
+
+          <details class="desplegable">
+            <summary>Mover o eliminar este tema</summary>
+            <div class="opciones-tema">
+              {% if destinos %}
+                <form method="post" class="mover-tema"
+                      action="{{ url_for('mover_tema', slug=area.slug, id_tema=tema.id) }}">
+                  <label for="destino-{{ tema.id }}">Mover a</label>
+                  <select id="destino-{{ tema.id }}" name="destino" required>
+                    {% for d in destinos %}
+                      <option value="{{ d.slug }}">{{ d.nombre }}</option>
+                    {% endfor %}
+                  </select>
+                  <button class="boton boton-suave boton-chico" type="submit">Mover</button>
+                </form>
+              {% else %}
+                <p class="suave">Para mover este tema, primero creá otra área o subárea.</p>
+              {% endif %}
+              <a class="boton boton-borde-peligro boton-chico"
+                 href="{{ url_for('confirmar_eliminar_tema', slug=area.slug, id_tema=tema.id) }}">Eliminar tema</a>
+            </div>
+          </details>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% elif not subareas %}
+  <div class="vacio">
+    <h2>Esta área todavía no tiene temas</h2>
+    <p>Para sumar uno, importá un aprendizaje que tenga este nombre exacto en el campo "area":</p>
+    <p><code>"area": "{{ area.nombre }}"</code></p>
+    <a class="boton" href="{{ url_for('pagina_importar') }}">Importar</a>
+  </div>
+{% endif %}
+
+<div class="zona-peligro">
+  <a class="boton boton-borde-peligro" href="{{ url_for('confirmar_eliminar_area', slug=area.slug) }}">Eliminar esta área</a>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}No encontrado · Lean OS{% endblock %}
+
+{% block contenido %}
+<div class="vacio">
+  <h1>No encontré esa página</h1>
+  <p>Puede que el área ya no exista.</p>
+  <a class="boton" href="{{ url_for('ver_areas') }}">Volver a las áreas</a>
+</div>
+{% endblock %}

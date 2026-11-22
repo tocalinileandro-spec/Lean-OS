@@ -1,0 +1,16 @@
+{# Una tarjeta de área o subárea. Se usa en la lista de áreas y dentro de cada área. #}
+<a class="tarjeta tarjeta-enlace" href="{{ url_for('ver_area', slug=t.slug) }}">
+  <h2>{{ t.titulo }}</h2>
+  <p class="suave">
+    {% if t.cantidad_subareas %}
+      {{ t.cantidad_subareas }} subárea{{ '' if t.cantidad_subareas == 1 else 's' }} ·
+    {% endif %}
+    {{ t.cantidad_temas }} tema{{ '' if t.cantidad_temas == 1 else 's' }} ·
+    {{ t.cantidad_preguntas }} pregunta{{ '' if t.cantidad_preguntas == 1 else 's' }}
+  </p>
+  {% if t.cantidad_pendientes %}
+    <p><span class="etiqueta">{{ t.cantidad_pendientes }} para repasar hoy</span></p>
+  {% else %}
+    <p class="suave">Todo al día</p>
+  {% endif %}
+</a>

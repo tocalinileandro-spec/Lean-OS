@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Lean OS{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+
+  <header class="barra">
+    <div class="barra-interior">
+      <a class="marca" href="{{ url_for('ver_areas') }}">
+        <span class="marca-punto" aria-hidden="true"></span>Lean OS
+      </a>
+      <nav class="menu" aria-label="Principal">
+        <a href="{{ url_for('ver_areas') }}" {% if seccion == 'areas' %}aria-current="page"{% endif %}>Áreas</a>
+        <a href="{{ url_for('ver_repaso') }}" {% if seccion == 'repaso' %}aria-current="page"{% endif %}>
+          Repaso
+          {% if pendientes_total %}<span class="insignia" aria-label="{{ pendientes_total }} pendientes">{{ pendientes_total }}</span>{% endif %}
+        </a>
+        <a href="{{ url_for('pagina_importar') }}" {% if seccion == 'importar' %}aria-current="page"{% endif %}>Importar</a>
+        <a href="{{ url_for('exportar_todo') }}" class="menu-aparte">Exportar todo</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenido" class="contenedor">
+    {% block contenido %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

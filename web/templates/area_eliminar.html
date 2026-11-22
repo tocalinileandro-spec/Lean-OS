@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block titulo %}Eliminar {{ area.nombre }} · Lean OS{% endblock %}
+
+{% block contenido %}
+<p class="migas"><a href="{{ url_for('ver_area', slug=area.slug) }}">← Volver a {{ area.nombre.split(' > ')[-1] }}</a></p>
+
+<h1>¿Eliminar el área "{{ area.nombre }}"?</h1>
+
+<div class="aviso aviso-error" role="alert">
+  Se van a eliminar
+  <strong>{{ cantidad_temas }} tema{{ '' if cantidad_temas == 1 else 's' }}</strong> y
+  <strong>{{ cantidad_preguntas }} pregunta{{ '' if cantidad_preguntas == 1 else 's' }}</strong>,
+  con todo su progreso de repaso.
+  {% if subareas %}
+    <br>Esto incluye {{ subareas | length }} subárea{{ '' if subareas | length == 1 else 's' }}:
+    <ul>
+      {% for s in subareas %}<li>{{ s.nombre }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+</div>
+
+<p class="suave intro">
+  No se borra del disco: los archivos se mueven a la carpeta <code>papelera</code> dentro de tus datos,
+  por si te arrepentís. Si después importás de nuevo los mismos bloques, se vuelven a guardar normalmente.
+</p>
+
+<form method="post" action="{{ url_for('eliminar_area', slug=area.slug) }}" class="acciones">
+  <button class="boton boton-peligro" type="submit">Sí, eliminar{{ ' todo' if subareas else ' el área' }}</button>
+  <a class="boton boton-suave" href="{{ url_for('ver_area', slug=area.slug) }}">Cancelar</a>
+</form>
+{% endblock %}

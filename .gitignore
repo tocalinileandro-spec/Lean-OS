@@ -1,0 +1,18 @@
+# Entorno de Python y archivos que se generan solos
+.venv/
+__pycache__/
+*.pyc
+
+# Versión descargable: se arma con construir_exe.bat, no se sube
+build/
+dist/
+*.spec
+_guardado_temporal/
+
+# Tus datos NO van al repositorio (viven en tu carpeta de datos, por ejemplo en la nube)
+datos/
+papelera/
+respaldos/
+
+# Tu configuración personal (tiene tu ruta). Se sube configuracion.ejemplo.json en su lugar.
+configuracion.json

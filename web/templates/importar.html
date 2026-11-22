@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Importar · Lean OS{% endblock %}
+
+{% block contenido %}
+<h1>Importar</h1>
+<p class="suave intro">Pegá acá el bloque JSON que te dio la otra herramienta. Antes de guardar nada te muestro qué va a pasar.</p>
+
+{% if nombres_areas %}
+  <p class="aviso aviso-info">
+    <strong>Tus áreas:</strong> {{ nombres_areas | join(", ") }}.<br>
+    Para sumar un tema a una de ellas, el campo <code>"area"</code> del bloque tiene que llevar
+    ese nombre (da igual mayúsculas o minúsculas). Si escribe otro nombre, se crea un área nueva.
+  </p>
+{% endif %}
+
+{% if errores %}
+  <div class="aviso aviso-error" role="alert">
+    <strong>No pude leer el bloque. Corregí esto y probá de nuevo:</strong>
+    <ul>
+      {% for mensaje in errores %}<li>{{ mensaje }}</li>{% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<form method="post" action="{{ url_for('revisar_importacion') }}" class="tarjeta">
+  <label for="texto">Bloque JSON</label>
+  <textarea id="texto" name="texto" rows="14" spellcheck="false"
+            placeholder='{ "tipo": "aprendizaje", "fecha": "2026-11-14", "area": "CS50", ... }'>{{ texto }}</textarea>
+  <div class="acciones">
+    <button class="boton" type="submit">Revisar</button>
+  </div>
+</form>
+{% endblock %}

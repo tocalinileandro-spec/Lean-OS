@@ -1,0 +1,8 @@
+{
+  "_ayuda": "Copiá este archivo como configuracion.json y editalo. carpeta_datos: donde se guardan tus datos. Puede ser una ruta completa dentro de una carpeta sincronizada con la nube, por ejemplo C:/Users/TuUsuario/OneDrive/lean_os_datos (usá / en vez de \\). direccion y puerto: donde escucha el servidor (127.0.0.1 = solo esta PC). como_abrir: ventana (Edge como app), navegador o nada.",
+  "carpeta_datos": "datos",
+  "direccion": "127.0.0.1",
+  "puerto": 5000,
+  "como_abrir": "ventana",
+  "respaldos_a_conservar": 30
+}

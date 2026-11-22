@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block titulo %}Importación · Lean OS{% endblock %}
+
+{% block contenido %}
+{% if resultado.guardado %}
+  <div class="vacio">
+    <div class="check" aria-hidden="true">✓</div>
+    <h1>Guardado</h1>
+    <p>{{ resultado.vista.titulo }}</p>
+    <div class="acciones acciones-centro">
+      <a class="boton" href="{{ url_for('ver_area', slug=resultado.slug_area) }}">Ver el área</a>
+      <a class="boton boton-suave" href="{{ url_for('ver_repaso') }}">Repasar ahora</a>
+      <a class="boton boton-suave" href="{{ url_for('pagina_importar') }}">Importar otro</a>
+    </div>
+  </div>
+{% else %}
+  <div class="vacio">
+    <h1>No se guardó nada</h1>
+    <p>Ese bloque ya estaba importado, así que no lo dupliqué.</p>
+    <div class="acciones acciones-centro">
+      <a class="boton" href="{{ url_for('ver_areas') }}">Ir a las áreas</a>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

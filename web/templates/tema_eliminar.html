@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Eliminar tema · Lean OS{% endblock %}
+
+{% block contenido %}
+<p class="migas"><a href="{{ url_for('ver_area', slug=area.slug) }}">← Volver a {{ area.nombre.split(' > ')[-1] }}</a></p>
+
+<h1>¿Eliminar el tema "{{ tema.tema }}"?</h1>
+
+<div class="aviso aviso-error" role="alert">
+  Se van a eliminar el resumen y
+  <strong>{{ tema.preguntas | length }} pregunta{{ '' if tema.preguntas | length == 1 else 's' }}</strong>,
+  con todo su progreso de repaso.
+</div>
+
+<section class="tarjeta">
+  <h2>{{ tema.tema }}</h2>
+  <p class="suave">{{ area.nombre }} · {{ tema.fecha | fecha_corta }}</p>
+  <p class="texto-largo">{{ tema.resumen }}</p>
+</section>
+
+<p class="suave intro">
+  Se guarda una copia en la carpeta <code>papelera</code> dentro de tus datos, por si te arrepentís.
+  Si después importás de nuevo el mismo bloque, se vuelve a guardar normalmente.
+</p>
+
+<form method="post" action="{{ url_for('eliminar_tema', slug=area.slug, id_tema=tema.id) }}" class="acciones">
+  <button class="boton boton-peligro" type="submit">Sí, eliminar el tema</button>
+  <a class="boton boton-suave" href="{{ url_for('ver_area', slug=area.slug) }}">Cancelar</a>
+</form>
+{% endblock %}

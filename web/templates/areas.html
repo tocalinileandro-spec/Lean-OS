@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block titulo %}Áreas · Lean OS{% endblock %}
+
+{% block contenido %}
+<div class="encabezado">
+  <h1>Tus áreas</h1>
+  {% if pendientes_total %}
+    <a class="boton" href="{{ url_for('ver_repaso') }}">Repasar hoy · {{ pendientes_total }}</a>
+  {% endif %}
+</div>
+
+{% if eliminada %}
+  <div class="aviso aviso-info" role="status">
+    El área <strong>{{ eliminada }}</strong>
+    {% if subareas_eliminadas %}y sus {{ subareas_eliminadas }} subárea{{ '' if subareas_eliminadas == 1 else 's' }}{% endif %}
+    se eliminó{{ '' if not subareas_eliminadas else 'eron' }}.
+    Los archivos quedaron en la carpeta <code>papelera</code> de tus datos.
+  </div>
+{% endif %}
+
+{% if error %}
+  <div class="aviso aviso-error" role="alert">{{ error }}</div>
+{% endif %}
+
+{# Para crear un área vacía (por ejemplo "Python") antes de importar nada #}
+<form class="nueva-area" method="post" action="{{ url_for('crear_area') }}">
+  <label for="nombre-area" class="solo-lector">Nombre de la nueva área</label>
+  <input id="nombre-area" name="nombre" type="text" maxlength="60" required
+         placeholder="Nueva área, por ejemplo: Python" value="{{ nombre_nuevo or '' }}">
+  <button class="boton" type="submit">Crear área</button>
+</form>
+
+{% if tarjetas %}
+  <ul class="grilla">
+    {% for t in tarjetas %}
+      <li>{% include "_tarjeta_area.html" %}</li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <div class="vacio">
+    <h2>Todavía no hay nada acá</h2>
+    <p>Creá tu primera área arriba, o pegá un aprendizaje y se va a crear sola.</p>
+    <a class="boton" href="{{ url_for('pagina_importar') }}">Importar mi primer aprendizaje</a>
+  </div>
+{% endif %}
+{% endblock %}

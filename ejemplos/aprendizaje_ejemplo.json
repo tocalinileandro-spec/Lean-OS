@@ -1,0 +1,24 @@
+{
+  "tipo": "aprendizaje",
+  "fecha": "2026-11-14",
+  "area": "CS50",
+  "tema": "Punteros en C",
+  "resumen": "Un puntero es una variable que guarda la dirección de memoria de otra variable. Se declara con * y se obtiene la dirección de algo con &.",
+  "preguntas": [
+    {
+      "p": "¿Qué guarda un puntero?",
+      "r": "La dirección de memoria de otra variable.",
+      "pista": "Piensa en una dirección postal, no en la casa."
+    },
+    {
+      "p": "¿Qué operador devuelve la dirección de una variable?",
+      "r": "El operador & (ampersand).",
+      "pista": ""
+    },
+    {
+      "p": "¿Para qué sirve el * al usar un puntero ya declarado?",
+      "r": "Para acceder al valor guardado en esa dirección (desreferenciar).",
+      "pista": "Es ir a la casa que indica la dirección."
+    }
+  ]
+}
