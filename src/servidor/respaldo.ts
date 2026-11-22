@@ -5,23 +5,18 @@ import { join } from "node:path";
 import { TABLAS } from "../compartido/esquema.ts";
 import type { Tabla } from "../compartido/esquema.ts";
 import type { Reloj } from "../compartido/reloj.ts";
-import { contarFilas, filasDesde, fijarRev, guardarFila, revActual, validarRegistro } from "./sync.ts";
-import type { Fila } from "./sync.ts";
+import { armarExportacion, validarExportacion, VERSION_FORMATO } from "../compartido/respaldo-formato.ts";
+import type { Exportacion, Fila } from "../compartido/respaldo-formato.ts";
+import { contarFilas, filasDesde, fijarRev, guardarFila, revActual } from "./sync.ts";
 
-export const VERSION_FORMATO = 1;
+export { VERSION_FORMATO };
+export type { Exportacion };
 export const RESPALDOS_A_CONSERVAR = 30;
-
-export interface Exportacion {
-  formato: number;
-  exportado_en: string;
-  rev: number;
-  tablas: Record<Tabla, Fila[]>;
-}
 
 export function exportarTodo(db: DatabaseSync, reloj: Reloj): Exportacion {
   const tablas = {} as Record<Tabla, Fila[]>;
   for (const t of TABLAS) tablas[t] = filasDesde(db, t, -1, Number.MAX_SAFE_INTEGER);
-  return { formato: VERSION_FORMATO, exportado_en: reloj.ahora().toISOString(), rev: revActual(db), tablas };
+  return armarExportacion(tablas, revActual(db), reloj.ahora());
 }
 
 export function contarTodo(db: DatabaseSync): Record<Tabla, number> {
@@ -39,18 +34,9 @@ export interface OpcionesRestauracion {
 
 /** Restaura un export a un servidor vacío (conserva ids y revs). Todo o nada. */
 export function restaurarRespaldo(db: DatabaseSync, datos: unknown, opciones: OpcionesRestauracion = {}): Record<Tabla, number> {
-  const d = datos as Partial<Exportacion> | null;
-  if (typeof d !== "object" || d === null || d.formato !== VERSION_FORMATO || typeof d.tablas !== "object" || d.tablas === null) {
-    throw new ErrorRestauracion("El archivo no es un respaldo de Lean OS con un formato conocido.");
-  }
-  for (const t of TABLAS) {
-    const lista = d.tablas[t];
-    if (!Array.isArray(lista)) throw new ErrorRestauracion(`Al respaldo le falta la tabla ${t}.`);
-    lista.forEach((r, i) => {
-      const motivo = validarRegistro(t, r, true);
-      if (motivo) throw new ErrorRestauracion(`El registro ${i + 1} de ${t} es inválido: ${motivo}.`);
-    });
-  }
+  const v = validarExportacion(datos, true);
+  if ("error" in v) throw new ErrorRestauracion(v.error);
+  const d = v.exportacion;
   const hayDatos = TABLAS.some((t) => contarFilas(db, t) > 0);
   if (hayDatos && !opciones.reemplazarDatos) {
     throw new ErrorRestauracion("El servidor ya tiene datos: no se restaura encima. Restaurá en un servidor vacío o pedí el reemplazo explícito.");

@@ -11,7 +11,11 @@ import { TABLAS } from "../compartido/esquema.ts";
 import type { Tabla } from "../compartido/esquema.ts";
 import type { Reloj } from "../compartido/reloj.ts";
 
-export type Fila = Record<string, unknown>;
+import { validarRegistro } from "../compartido/respaldo-formato.ts";
+import type { Fila } from "../compartido/respaldo-formato.ts";
+
+export type { Fila };
+export { validarRegistro };
 
 export const TOLERANCIA_FUTURO_MS = 5 * 60_000;
 /** Si el push dejaría borradas más de esta fracción de las tarjetas vivas, se pide confirmación. */
@@ -53,21 +57,6 @@ export interface PedidoConfirmacion {
 const ms = (v: unknown): number => Date.parse(String(v));
 const esFecha = (v: unknown): v is string => typeof v === "string" && Number.isFinite(Date.parse(v));
 const esObjeto = (v: unknown): v is Fila => typeof v === "object" && v !== null && !Array.isArray(v);
-
-/** Valida la forma mínima de un registro. Devuelve el motivo (sin eco del contenido) o null. */
-export function validarRegistro(tabla: Tabla, r: unknown, exigirRev = false): string | null {
-  if (!esObjeto(r)) return "no es un objeto";
-  if (typeof r["id"] !== "string" || r["id"] === "" || r["id"].length > 100) return "falta un id válido";
-  if (!esFecha(r["created_at"])) return "falta created_at válido";
-  if (!esFecha(r["updated_at"])) return "falta updated_at válido";
-  if (r["deleted_at"] != null && !esFecha(r["deleted_at"])) return "deleted_at inválido";
-  if (tabla === "tarjetas") {
-    if (!esFecha(r["contenido_updated_at"])) return "falta contenido_updated_at válido";
-    if (!esFecha(r["repaso_updated_at"])) return "falta repaso_updated_at válido";
-  }
-  if (exigirRev && !(Number.isInteger(r["rev"]) && (r["rev"] as number) >= 0)) return "falta rev válido";
-  return null;
-}
 
 /** Valida el cuerpo de push. Devuelve los cambios tipados o un mensaje de error en castellano. */
 export function validarPush(cuerpo: unknown): { cambios: Cambio[]; confirmar: boolean } | { error: string } {
