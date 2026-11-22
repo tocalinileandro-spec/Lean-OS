@@ -2,9 +2,11 @@
  * Almacén sobre IndexedDB (navegador). Sin dependencias. Cada método es una transacción; `guardarLote`
  * escribe varias tablas en una sola. Los registros se guardan con un número de secuencia interno (`_seq`)
  * para devolver `listar` en orden de inserción (IndexedDB ordena por clave, que acá es un UUID).
- * La store `cola_cambios` queda creada para la sincronización futura (fase 4); no tiene lógica todavía.
+ * La store `cola_cambios` guarda los (tabla, id) pendientes de subir; `ColaIndexedDB` la maneja y
+ * `AlmacenSincronizado` (sync/cola.ts) la llena al guardar.
  */
 import type { Almacen, Lote, OpcionesListar, Repositorio, RepositorioRepasos } from "../compartido/almacen.ts";
+import type { ColaCambios, CambioPendiente, EntradaCola } from "./sync/cola.ts";
 import type { Apunte, Area, Id, Importacion, Meta, Registro, Repaso, Tarea, Tarjeta } from "../compartido/esquema.ts";
 
 export const VERSION_BASE = 1;
@@ -103,6 +105,29 @@ class RepasosIDB implements RepositorioRepasos {
   }
 }
 
+/** Cola de cambios sobre la store `cola_cambios` (clave autoincremental `seq`). */
+export class ColaIndexedDB implements ColaCambios {
+  constructor(private db: IDBDatabase) {}
+  async anotar(cambios: CambioPendiente[]) {
+    if (cambios.length === 0) return;
+    const tx = this.db.transaction(COLA, "readwrite");
+    const fin = terminar(tx);
+    for (const c of cambios) tx.objectStore(COLA).add({ tabla: c.tabla, id: c.id });
+    await fin;
+  }
+  async entradas() {
+    const filas = (await pedir(this.db.transaction(COLA, "readonly").objectStore(COLA).getAll())) as EntradaCola[];
+    return filas.sort((a, b) => a.seq - b.seq);
+  }
+  async quitar(entradas: EntradaCola[]) {
+    if (entradas.length === 0) return;
+    const tx = this.db.transaction(COLA, "readwrite");
+    const fin = terminar(tx);
+    for (const e of entradas) tx.objectStore(COLA).delete(e.seq);
+    await fin;
+  }
+}
+
 export class AlmacenIndexedDB implements Almacen {
   tarjetas: Repositorio<Tarjeta>;
   areas: Repositorio<Area>;
@@ -150,6 +175,11 @@ export class AlmacenIndexedDB implements Almacen {
       throw e;
     }
     await fin;
+  }
+
+  /** Cola de cambios pendientes de esta base. */
+  get cola(): ColaIndexedDB {
+    return new ColaIndexedDB(this.db);
   }
 
   cerrar(): void {

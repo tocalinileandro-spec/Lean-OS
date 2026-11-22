@@ -15,6 +15,7 @@ import {
   editarTarea, marcarHecha,
 } from "../../compartido/tareas.ts";
 import { diaLogico } from "../../compartido/dia.ts";
+import type { ControlSync } from "../sync/motor.ts";
 import { TIPOS_APUNTE, type Apunte, type Calificacion, type EstadoMeta, type Id, type Tarea, type Tarjeta, type TipoApunte, type Trimestre } from "../../compartido/esquema.ts";
 import {
   agruparTarjetas, cargarAjustes, formatearFecha, guardarAjustes, mensajeDeError, nombreDeArea, opcionesDeArea,
@@ -25,6 +26,8 @@ import {
   vistaApuntes, vistaTareas, type MetaConProgreso,
 } from "./logica-tareas.ts";
 import { renderizarMarkdown } from "./markdown.ts";
+import { detalleEstado, formatearInstante, textoEstado } from "../sync/estado.ts";
+import { exportarLocal, importarRespaldo, lineasDeInforme, type InformeRespaldo } from "../sync/respaldo.ts";
 
 export type Pantalla = "hoy" | "repaso" | "tareas" | "apuntes" | "tarjetas" | "ajustes";
 const PANTALLAS: { id: Pantalla; titulo: string }[] = [
@@ -76,6 +79,10 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   let tareaEnForm: Id | "nueva" | null = null;
   let formMeta: "anual" | "trimestral" | null = null;
   let capturaAbierta = false;
+  let errorCuenta = "";
+  let informeRespaldo: InformeRespaldo | null = null;
+  let cuentaDibujada = false;
+  let versionVista = 0;
   let apunteEnEdicion: Id | null = null;
   let borradorTarjeta: { apunteId: Id; b: BorradorTarjeta } | null = null;
   const filtros = { texto: "", tipo: "", etiqueta: "", area: "" };
@@ -105,6 +112,11 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     }).catch((e) => { aviso = mensajeDeError(e); }).then(dibujar);
   }
 
+  /** Redibuja sin tocar los avisos (lo usa la sincronización en segundo plano). */
+  function redibujar(): void {
+    cola = cola.then(dibujar);
+  }
+
   function ir(p: Pantalla): void {
     accion(async () => {
       pantalla = p;
@@ -114,11 +126,54 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   }
 
   // ---------- estructura ----------
+  const cabecera = h("div", { class: "cabecera" });
   const nav = h("nav", { "aria-label": "Pantallas", class: "nav" });
   const principal = h("main", { id: "principal", tabindex: "-1" });
-  raiz.replaceChildren(nav, principal);
+  raiz.replaceChildren(cabecera, nav, principal);
+
+  /** Indicador de sincronización (y pedido de confirmación de borrado masivo) siempre visible arriba. */
+  function dibujarCabecera(): void {
+    const s = d.sync;
+    if (!s) return;
+    const e = s.estado();
+    cabecera.replaceChildren(
+      h("button", {
+        type: "button", id: "estado-sync", class: `estado-sync estado-${e.fase}`, title: "Ver el detalle en Ajustes", onclick: () => ir("ajustes"),
+      }, textoEstado(e)),
+      ...(e.confirmacion ? [h("div", { class: "aviso confirmar-borrado", role: "alert" },
+        h("p", {}, e.confirmacion.mensaje),
+        boton("Confirmar y sincronizar", () => { void s.confirmarBorradoMasivo(); }, "peligro chico"))] : []));
+  }
+
+  /** Detalle del estado en Ajustes: se actualiza en el lugar, sin redibujar (no se pierde lo que se está escribiendo). */
+  function dibujarDetalleSync(): void {
+    const s = d.sync;
+    const el = principal.querySelector("#detalle-sync");
+    if (!s || !el) return;
+    const e = s.estado();
+    const partes = [`Estado: ${textoEstado(e)}.`, detalleEstado(e)];
+    if (e.ultimaVez) partes.push(`Última sincronización: ${formatearInstante(e.ultimaVez)}.`);
+    el.textContent = partes.join(" ");
+  }
+
+  if (d.sync) {
+    d.sync.suscribir((e) => {
+      dibujarCabecera();
+      dibujarDetalleSync();
+      const act = doc.activeElement as HTMLElement | null;
+      const escribiendo = !!act && ["INPUT", "TEXTAREA", "SELECT"].includes(act.tagName);
+      const cambioCuenta = pantalla === "ajustes" && d.sync!.hayCuenta() !== cuentaDibujada;
+      // Llegaron datos nuevos del servidor (o cambió la cuenta): se redibuja la pantalla si no se está escribiendo.
+      if (!escribiendo && (e.versionDatos !== versionVista || cambioCuenta)) redibujar();
+    });
+  }
 
   async function dibujar(): Promise<void> {
+    if (d.sync) {
+      await d.sync.refrescar();
+      versionVista = d.sync.estado().versionDatos;
+      dibujarCabecera();
+    }
     nav.replaceChildren(...PANTALLAS.map((p) =>
       h("button", { type: "button", class: "nav-item", "aria-current": p.id === pantalla ? "page" : undefined, onclick: () => ir(p.id) }, p.titulo)));
     const activo = doc.activeElement as HTMLElement | null;
@@ -136,6 +191,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       contenido.push(h("p", { class: "aviso", role: "alert" }, mensajeDeError(e)));
     }
     principal.replaceChildren(...contenido.filter((x): x is Node => !!x));
+    dibujarDetalleSync();
     // Si se estaba escribiendo en un campo (búsqueda), se conserva el foco; si no, va a la acción principal.
     const mismo = idActivo ? principal.querySelector<HTMLInputElement>(`#${idActivo}`) : null;
     if (mismo && CAMPOS_CON_FOCO.includes(mismo.id)) {
@@ -579,7 +635,83 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       h("label", {}, "Tarjetas nuevas por día", nuevas),
       h("label", {}, "Hora de cambio de día", hora),
       h("p", { class: "suave" }, "A esa hora empieza el día nuevo para el repaso. Los cambios se guardan solos."),
-      errorAjustes && h("p", { class: "aviso", role: "alert" }, errorAjustes));
+      errorAjustes && h("p", { class: "aviso", role: "alert" }, errorAjustes),
+      d.sync && dibujarCuenta(d.sync),
+      dibujarRespaldo());
+  }
+
+  function dibujarCuenta(s: ControlSync): Node {
+    cuentaDibujada = s.hayCuenta();
+    const detalle = h("p", { id: "detalle-sync", class: "suave", role: "status" });
+    if (cuentaDibujada) {
+      return h("div", { class: "cuenta" },
+        h("h2", {}, "Cuenta"),
+        h("p", {}, "Sesión iniciada: tus datos se sincronizan con el servidor."),
+        detalle,
+        h("div", { class: "acciones" },
+          boton("Sincronizar ahora", () => { void s.sincronizarAhora(); }, "principal chico"),
+          boton("Cerrar sesión", () => accion(async () => {
+            await s.cerrarSesion();
+            aviso = "Sesión cerrada. Tus datos siguen guardados en este dispositivo.";
+          }), "suave chico")));
+    }
+    const clave = h("input", { type: "password", id: "cuenta-clave", "aria-label": "Contraseña", autocomplete: "current-password" }) as HTMLInputElement;
+    const entrar = () => accion(async () => {
+      const r = await s.iniciarSesion(clave.value);
+      clave.value = "";
+      errorCuenta = r.ok ? "" : r.mensaje;
+      if (r.ok) aviso = "Sesión iniciada. Sincronizando…";
+    });
+    clave.addEventListener("keydown", (ev) => {
+      const ke = ev as KeyboardEvent;
+      if (ke.key === "Enter" && !ke.isComposing) { ke.preventDefault(); entrar(); }
+    });
+    return h("div", { class: "cuenta" },
+      h("h2", {}, "Cuenta"),
+      detalle,
+      h("label", {}, "Contraseña", clave),
+      errorCuenta && h("p", { class: "aviso", role: "alert" }, errorCuenta),
+      h("div", { class: "acciones" }, boton("Iniciar sesión", entrar, "principal chico")));
+  }
+
+  function dibujarRespaldo(): Node {
+    const archivo = h("input", {
+      type: "file", id: "archivo-respaldo", accept: ".json,application/json", "aria-label": "Archivo de respaldo",
+      onchange: (ev: Event) => {
+        const el = ev.target as HTMLInputElement;
+        const f = el.files?.[0];
+        if (!f) return;
+        accion(async () => {
+          const texto = await (d.leerArchivo ?? ((x: File) => x.text()))(f);
+          informeRespaldo = await importarRespaldo(d.almacen, texto);
+        });
+      },
+    }) as HTMLInputElement;
+    return h("div", { class: "respaldo" },
+      h("h2", {}, "Respaldo"),
+      h("p", { class: "suave" }, "Exportar descarga un archivo con todo (incluida la papelera y todos los repasos). Importar suma ese archivo a lo que ya tenés, sin borrar nada ni pisar lo más reciente."),
+      h("div", { class: "acciones" },
+        boton("Exportar todo", () => accion(async () => {
+          const e = await exportarLocal(d.almacen, d.reloj);
+          (d.descargar ?? ((n, t) => descargarEnNavegador(n, t)))(`lean-os-respaldo-${diaLogico(d.reloj)}.json`, JSON.stringify(e));
+          aviso = `Se descargó el respaldo: ${e.tablas.tarjetas.length} tarjetas, ${e.tablas.repasos.length} repasos, ${e.tablas.tareas.length} tareas y ${e.tablas.apuntes.length} apuntes. Guardalo en un lugar seguro, por ejemplo Google Drive.`;
+        }), "principal chico")),
+      h("label", {}, "Importar un respaldo", archivo),
+      informeRespaldo && h("div", { class: "informe", role: "status" },
+        h("ul", { class: informeRespaldo.ok ? "" : "errores" }, ...lineasDeInforme(informeRespaldo).map((l) => h("li", {}, l)))));
+  }
+
+  /** Descarga un texto como archivo desde el navegador. */
+  function descargarEnNavegador(nombre: string, texto: string): void {
+    const ventana = doc.defaultView!;
+    const url = ventana.URL.createObjectURL(new ventana.Blob([texto], { type: "application/json" }));
+    const a = doc.createElement("a");
+    a.href = url;
+    a.download = nombre;
+    doc.body.append(a);
+    a.click();
+    a.remove();
+    ventana.setTimeout(() => ventana.URL.revokeObjectURL(url), 5000);
   }
 
   // ---------- teclado ----------

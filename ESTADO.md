@@ -22,3 +22,5 @@
 - **Despliegue / secretos:** pendientes hasta la fase 4.
 
 - **F4-b hecha (rama `tarea/F4-b`):** sync del servidor (push idempotente con conflictos por grupo, pull paginado, borrado masivo S6), export, restauración (`npm run restaurar`), respaldo nocturno con retención de 30 y planificador. Exigibles suman S3, S4, S5, S6, G4. Falta F4-c: cliente de sync (S2, S7, estado de sync, exportar/importar en Ajustes), PWA y despliegue.
+
+- **F4-c hecha (rama `tarea/F4-c`):** cliente de sync (`src/cliente/sync/`), login/logout, indicador de estado, "Sincronizar ahora", confirmación de borrado masivo, Exportar/Importar respaldo (formato compartido en `src/compartido/respaldo-formato.ts`). Exigibles suman S2 y S7. Falta de la fase 4: PWA instalable, despliegue en Fly.io (B3) y G5 (escaneo de secretos), si no están hechos.
