@@ -21,3 +21,49 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run verificar
+
+  # Despliegue (B3): solo en push a main y solo si `verificar` quedó verde. Sin FLY_API_TOKEN se saltea con un aviso (no falla).
+  desplegar:
+    needs: verificar
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: desplegar
+      cancel-in-progress: false
+    env:
+      # Nombre de la app en Fly (debe coincidir con `app` de fly.toml).
+      FLY_APP: lean-os
+    steps:
+      - uses: actions/checkout@v4
+      - name: Revisar si está cargado FLY_API_TOKEN
+        id: token
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -n "$FLY_API_TOKEN" ]; then
+            echo "hay=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hay=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Despliegue salteado::Falta el secreto FLY_API_TOKEN. Cargalo siguiendo SECRETOS.md; mientras tanto no se despliega."
+          fi
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.token.outputs.hay == 'true'
+      - name: Desplegar en Fly.io
+        if: steps.token.outputs.hay == 'true'
+        run: flyctl deploy --remote-only --app "$FLY_APP"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Consultar /health por HTTPS
+        if: steps.token.outputs.hay == 'true'
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            respuesta="$(curl -fsS --max-time 10 "https://$FLY_APP.fly.dev/health" || true)"
+            if [ "$respuesta" = "ok" ]; then
+              echo "/health respondió ok por HTTPS"
+              exit 0
+            fi
+            echo "Intento $i: todavía no responde ok"
+            sleep 10
+          done
+          echo "::error::/health no respondió ok por HTTPS"
+          exit 1
