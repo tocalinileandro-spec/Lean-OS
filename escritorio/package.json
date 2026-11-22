@@ -1,0 +1,26 @@
+{
+  "name": "lean-os-escritorio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lean OS: app de Windows (.exe portable)",
+  "author": "Lean OS",
+  "main": "app/principal.cjs",
+  "scripts": {
+    "empaquetar": "electron-builder --win portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "ar.leanos.escritorio",
+    "productName": "Lean OS",
+    "asar": true,
+    "directories": { "output": "salida" },
+    "files": ["app/**", "package.json"],
+    "extraResources": [{ "from": "../dist", "to": "dist" }],
+    "win": { "target": [{ "target": "portable", "arch": ["x64"] }], "icon": "app/icono.png", "signAndEditExecutable": true },
+    "portable": { "artifactName": "Lean-OS.exe" }
+  }
+}

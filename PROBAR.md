@@ -80,3 +80,16 @@ Para restaurar un respaldo en un servidor nuevo y vacío:
 ```
 npm run restaurar -- ruta\al\respaldo.json
 ```
+
+## 8. App de Windows (.exe)
+
+Es la misma app empaquetada en un solo archivo, `Lean-OS.exe` (no instala nada y abre sin conexión).
+
+1. **Dónde bajarlo:** en GitHub, pestaña **Actions**, abrí la última corrida verde del CI y bajá el artefacto **Lean-OS-exe** (queda 30 días). Viene en un .zip: descomprimilo.
+2. **Cómo abrirlo:** doble clic en `Lean-OS.exe`, o desde `cmd`: `Lean-OS.exe`. Tarda unos segundos la primera vez (se descomprime solo). Solo se abre una ventana a la vez.
+3. **SmartScreen:** Windows puede mostrar "Windows protegió su PC" porque el .exe no está firmado (firmarlo cuesta dinero). Tocá **Más información** y luego **Ejecutar de todas formas**.
+4. **Dónde quedan los datos:** en `%APPDATA%\Lean OS` (pegalo en el Explorador). Ahí está la copia local (IndexedDB). Borrar esa carpeta borra los datos locales de la app de Windows: exportá un respaldo antes (Ajustes > Respaldo).
+5. **Sincronización:** la app de Windows sincroniza con `https://lean-os.fly.dev` por defecto. Para usar otro servidor, creá `%APPDATA%\Lean OS\config.json` con `{ "servidor": "https://mi-servidor.example.com" }` y reabrí la app. La variable `LEAN_OS_SERVIDOR` tiene prioridad sobre ese archivo. Sin conexión funciona igual y sincroniza cuando vuelva la red.
+6. **Puerto:** usa el puerto local 47821 (fijo, porque de él depende dónde se guardan los datos). Si está ocupado, la app avisa y no abre; cerrá la otra copia o el programa que lo usa. `LEAN_OS_PUERTO` lo cambia, pero con otro puerto no ves los datos de antes.
+7. **Modos de prueba (solo para el CI):** con la variable `LEAN_OS_PRUEBA` = `salud`, `s1-escribir` o `s1-leer` el .exe hace una comprobación y se cierra con código 0 (o 1 si falla); `LEAN_OS_DATOS` fija la carpeta de datos (usá una temporal, nunca la real). En uso normal esas variables no existen. Para correrlos todos: `node escritorio/probar-exe.ts` (en Windows, con el .exe ya armado).
+8. **Armarlo a mano (Windows):** `npm ci`, `npm run build`, `node escritorio/compilar.ts`, luego en `escritorio\`: `npm ci` y `npm run empaquetar`. Sale `escritorio\salida\Lean-OS.exe`.
