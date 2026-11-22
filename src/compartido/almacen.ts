@@ -17,6 +17,8 @@ export interface Repositorio<T extends Registro> {
   guardar(item: T): Promise<void>;
   /** Inserta o reemplaza varios en una sola transacción (todo o nada). */
   guardarVarios(items: T[]): Promise<void>;
+  /** Elimina para siempre (solo la purga de la papelera). Ids inexistentes se ignoran. */
+  eliminarDefinitivo(ids: Id[]): Promise<void>;
 }
 
 /** Los repasos solo se agregan (registro que no se edita ni se borra). */
@@ -26,12 +28,22 @@ export interface RepositorioRepasos {
   listarPorTarjeta(tarjetaId: Id): Promise<Repaso[]>;
 }
 
+/** Registros que se guardan juntos, todo o nada (operaciones multi-tabla). */
+export interface Lote {
+  areas?: Area[];
+  tarjetas?: Tarjeta[];
+  apuntes?: Apunte[];
+  importaciones?: Importacion[];
+}
+
 export interface Almacen {
   tarjetas: Repositorio<Tarjeta>;
   areas: Repositorio<Area>;
   apuntes: Repositorio<Apunte>;
   importaciones: Repositorio<Importacion>;
   repasos: RepositorioRepasos;
+  /** Guarda varias tablas en una sola transacción (todo o nada). */
+  guardarLote(lote: Lote): Promise<void>;
 }
 
 class RepoMemoria<T extends Registro> implements Repositorio<T> {
@@ -50,6 +62,9 @@ class RepoMemoria<T extends Registro> implements Repositorio<T> {
   async guardarVarios(items: T[]) {
     const copia = structuredClone(items);
     for (const x of copia) this.datos.set(x.id, x);
+  }
+  async eliminarDefinitivo(ids: Id[]) {
+    for (const id of ids) this.datos.delete(id);
   }
 }
 
@@ -73,4 +88,13 @@ export class AlmacenMemoria implements Almacen {
   apuntes = new RepoMemoria<Apunte>();
   importaciones = new RepoMemoria<Importacion>();
   repasos = new RepasosMemoria();
+  /** Síncrono por dentro (sin esperas entre tablas), así que es atómico. */
+  async guardarLote(lote: Lote) {
+    await Promise.all([
+      this.areas.guardarVarios(lote.areas ?? []),
+      this.tarjetas.guardarVarios(lote.tarjetas ?? []),
+      this.apuntes.guardarVarios(lote.apuntes ?? []),
+      this.importaciones.guardarVarios(lote.importaciones ?? []),
+    ]);
+  }
 }

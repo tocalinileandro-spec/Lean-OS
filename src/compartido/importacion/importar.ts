@@ -77,13 +77,12 @@ async function importarBloque(almacen: Almacen, reloj: Reloj, b: BloqueValido, i
   const importacionId = nuevoId();
   let apunteId: Id | null = null;
   for (const t of nuevas) t.importacion_id = importacionId;
-  await almacen.tarjetas.guardarVarios(nuevas);
+  let ap: Apunte | null = null;
   if (b.resumen) {
-    const ap: Apunte = {
+    ap = {
       id: nuevoId(), created_at: ahora, updated_at: ahora, deleted_at: null, rev: null,
       titulo: b.tema, texto: b.resumen, tipo: "aprendizaje", etiquetas: [], area_id: hoja.id, tema: b.tema, importacion_id: importacionId,
     };
-    await almacen.apuntes.guardar(ap);
     apunteId = ap.id;
   }
   const imp: Importacion = {
@@ -91,7 +90,8 @@ async function importarBloque(almacen: Almacen, reloj: Reloj, b: BloqueValido, i
     tema: b.tema, fecha_bloque: b.fecha, area_id: hoja.id,
     tarjetas_creadas: nuevas.map((t) => t.id), duplicadas_omitidas: duplicadas, apunte_id: apunteId,
   };
-  await almacen.importaciones.guardar(imp);
+  // Tarjetas, apunte e importación entran juntos (una transacción): no queda una importación a medias.
+  await almacen.guardarLote({ tarjetas: nuevas, apuntes: ap ? [ap] : [], importaciones: [imp] });
   informe.creadas += nuevas.length;
 }
 
@@ -121,11 +121,11 @@ export async function deshacerUltimaImportacion(almacen: Almacen, reloj: Reloj):
   const ultima = imps.reduce((a, b) => (b.created_at >= a.created_at ? b : a));
   const ahora = reloj.ahora().toISOString();
   const tarjetas = (await almacen.tarjetas.listar()).filter((t) => ultima.tarjetas_creadas.includes(t.id));
-  await almacen.tarjetas.guardarVarios(tarjetas.map((t) => ({ ...t, deleted_at: ahora, updated_at: ahora, contenido_updated_at: ahora })));
-  if (ultima.apunte_id) {
-    const ap = await almacen.apuntes.obtener(ultima.apunte_id);
-    if (ap && ap.deleted_at === null) await almacen.apuntes.guardar({ ...ap, deleted_at: ahora, updated_at: ahora });
-  }
-  await almacen.importaciones.guardar({ ...ultima, deleted_at: ahora, updated_at: ahora });
+  const ap = ultima.apunte_id ? await almacen.apuntes.obtener(ultima.apunte_id) : undefined;
+  await almacen.guardarLote({
+    tarjetas: tarjetas.map((t) => ({ ...t, deleted_at: ahora, updated_at: ahora, contenido_updated_at: ahora })),
+    apuntes: ap && ap.deleted_at === null ? [{ ...ap, deleted_at: ahora, updated_at: ahora }] : [],
+    importaciones: [{ ...ultima, deleted_at: ahora, updated_at: ahora }],
+  });
   return { tarjetas: tarjetas.length };
 }
