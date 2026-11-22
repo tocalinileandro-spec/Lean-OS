@@ -33,10 +33,18 @@ export function validarRepeticion(r: unknown): Repeticion {
   throw new Error("El tipo de repetición no es válido");
 }
 
+/** La regla si es válida; null si no (datos que llegan de afuera con una regla rota se tratan como sin repetición). */
+export function reglaValida(r: unknown): Repeticion | null {
+  if (r === null || r === undefined) return null;
+  try { return validarRepeticion(r); } catch { return null; }
+}
+
 const NOMBRE_DIA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
 
 /** Texto para mostrar, en español rioplatense. */
-export function describirRepeticion(r: Repeticion): string {
+export function describirRepeticion(regla: unknown): string {
+  const r = reglaValida(regla);
+  if (!r) return "";
   if (r.tipo === "diaria") return "Se repite todos los días";
   if (r.tipo === "semanal") {
     const n = r.dias.map((d) => NOMBRE_DIA[d - 1]!);

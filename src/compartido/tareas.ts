@@ -5,7 +5,7 @@
 import type { Almacen } from "./almacen.ts";
 import { diaLogico } from "./dia.ts";
 import type { EstadoMeta, FechaISO, Id, Meta, Tarea, Trimestre } from "./esquema.ts";
-import { idOcurrencia, proximaFecha, validarRepeticion, type Repeticion } from "./recurrencia.ts";
+import { idOcurrencia, proximaFecha, reglaValida, validarRepeticion, type Repeticion } from "./recurrencia.ts";
 import { esFechaReal } from "./importacion/validacion.ts";
 import { construirCola } from "./repaso.ts";
 import type { Reloj } from "./reloj.ts";
@@ -158,21 +158,22 @@ export async function marcarHecha(almacen: Almacen, reloj: Reloj, id: Id): Promi
   if (t.estado === "hecha") return t;
   const ahora = ahoraDe(reloj);
   const nueva: Tarea = { ...t, estado: "hecha", hecha_en: ahora, updated_at: ahora };
-  if (!t.repeticion) {
+  const regla = reglaValida(t.repeticion);
+  if (!regla) { // sin regla, o regla corrupta llegada de afuera: se marca hecha sin generar nada
     await almacen.tareas.guardar(nueva);
     return nueva;
   }
   // Recurrente: la siguiente ocurrencia se crea en el mismo lote, con id determinista (no se duplica ni se pisa).
   const serie = t.serie_id ?? t.id;
   nueva.serie_id = serie;
-  const fecha = proximaFecha(t.repeticion, t.fecha, diaLogico(reloj));
+  const fecha = proximaFecha(regla, typeof t.fecha === "string" && FECHA.test(t.fecha) && esFechaReal(t.fecha) ? t.fecha : null, diaLogico(reloj));
   const idSig = idOcurrencia(serie, fecha);
   const tareas: Tarea[] = [nueva];
   if (!(await almacen.tareas.obtener(idSig))) {
     tareas.push({
       id: idSig, created_at: ahora, updated_at: ahora, deleted_at: null, rev: null,
       titulo: t.titulo, fecha, meta_id: t.meta_id, nota: t.nota, estado: "pendiente", hecha_en: null,
-      repeticion: structuredClone(t.repeticion), serie_id: serie,
+      repeticion: regla, serie_id: serie,
     });
   }
   await almacen.guardarLote({ tareas });

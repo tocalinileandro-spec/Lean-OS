@@ -258,3 +258,7 @@ Formato: fecha, qué se eligió, por qué.
 - **Dejar de repetir:** `detenerRepeticion` pone `repeticion` en null y deja `serie_id`. Borrar una ocurrencia solo la manda a la papelera y no cancela la serie: como la siguiente se crea al marcar hecha, si se borra la única pendiente simplemente no hay más ocurrencias (no se generan nuevas) hasta restaurarla; si se borra una pendiente y existían otras, las demás siguen su curso.
 - **UI:** selector "Repetir" (No / Todos los días / Ciertos días de la semana con casillas L M X J V S D / Un día del mes) en el formulario de tarea, con lo escrito conservado entre redibujados (las casillas guardan "1" o vacío en `recuerdo`); botón "Dejar de repetir" al editar una tarea con regla; indicador "↻ Se repite …" en las filas. La tarea rápida de Hoy no cambia.
 - **Pruebas:** `pruebas/o-recurrentes.test.ts` (O13-O19). `fase-actual.ts`: O13-O19 en `TODOS_LOS_IDS`, fase 6 e `IDS_EXIGIBLES` (solo se amplía).
+
+## 2026-11-22 (O-recurrentes, ciclo 2: robustez ante datos corruptos)
+
+- Una regla que no pasa `validarRepeticion` (llegada por servidor, sync o importación) se trata como sin repetición: `marcarHecha` marca hecha, no genera siguiente y nunca lanza. Una fecha que no pasa el formato AAAA-MM-DD real (`esFechaReal`) se trata como sin fecha (base = hoy). `describirRepeticion` devuelve vacío con reglas inválidas, y la lista y el formulario las ignoran (el selector queda en "No"). El dato roto no se modifica ni se borra hasta que el dueño guarde la tarea. Helper: `reglaValida`.

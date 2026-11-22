@@ -335,3 +335,49 @@ describe("O19: compatibilidad", () => {
     expect((await otro.crudo.tareas.listar()).find((x) => x.id === nueva.id)!.repeticion).toEqual({ tipo: "mensual", dia_mes: 5 });
   });
 });
+
+describe("O19: datos con regla o fecha corruptas", () => {
+  const malas: unknown[] = [
+    { tipo: "semanal", dias: [] }, { tipo: "raro" }, "hola", { tipo: "semanal", dias: [9] },
+    { tipo: "mensual", dia_mes: 0 }, { tipo: "semanal" },
+  ];
+  async function tareaCruda(a: AlmacenMemoria, r: RelojSimulado, extra: Record<string, unknown>) {
+    const t = await crearTarea(a, r, { titulo: "Cruda", fecha: HOY });
+    const cruda = { ...(await a.tareas.obtener(t.id))!, ...extra } as typeof t;
+    await a.tareas.guardar(cruda);
+    return t.id;
+  }
+
+  it("O19: marcarHecha con regla inválida marca hecha, no genera siguiente y no lanza", async () => {
+    for (const m of malas) {
+      const { a, r } = nuevo();
+      const id = await tareaCruda(a, r, { repeticion: m });
+      const h = await marcarHecha(a, r, id);
+      expect(h.estado).toBe("hecha");
+      expect(await a.tareas.listar()).toHaveLength(1);
+    }
+  });
+
+  it("O19: fecha corrupta se trata como sin fecha (base = hoy)", async () => {
+    for (const f of ["basura", "2026-13-45", "2026-02-31", 5]) {
+      const { a, r } = nuevo();
+      const id = await tareaCruda(a, r, { fecha: f, repeticion: DIARIA });
+      await marcarHecha(a, r, id);
+      const sig = (await a.tareas.listar()).find((x) => x.id !== id)!;
+      expect(sig.fecha).toBe("2026-11-23");
+    }
+  });
+
+  it("O19: la lista de tareas y el formulario renderizan con una regla inválida", async () => {
+    const ui = await abrir();
+    const t = await crearTarea(ui.almacen, new RelojSimulado("2026-11-22T15:00:00.000Z"), { titulo: "Rota", fecha: HOY });
+    await ui.almacen.tareas.guardar({ ...(await ui.almacen.tareas.obtener(t.id))!, repeticion: { tipo: "semanal" } as never });
+    await ui.ir("hoy");
+    expect(ui.raiz.textContent).toContain("Rota");
+    await ui.ir("tareas");
+    expect(ui.raiz.textContent).toContain("Rota");
+    expect(ui.raiz.textContent).not.toContain("Se repite");
+    await ui.clic("Editar");
+    expect(ui.q<HTMLSelectElement>("#tarea-repetir").value).toBe("no");
+  });
+});

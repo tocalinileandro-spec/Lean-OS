@@ -16,7 +16,7 @@ import {
 } from "../../compartido/tareas.ts";
 import { diaLogico } from "../../compartido/dia.ts";
 import type { ControlSync } from "../sync/motor.ts";
-import { describirRepeticion, type Repeticion } from "../../compartido/recurrencia.ts";
+import { describirRepeticion, reglaValida, type Repeticion } from "../../compartido/recurrencia.ts";
 import { TIPOS_APUNTE, type Apunte, type Calificacion, type EstadoMeta, type Id, type Tarea, type Tarjeta, type TipoApunte, type Trimestre } from "../../compartido/esquema.ts";
 import {
   agruparTarjetas, cargarAjustes, formatearFecha, guardarAjustes, mensajeDeError, nombreDeArea, opcionesDeArea,
@@ -278,7 +278,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
         h("span", { class: "texto" }, t.titulo),
         (o.fecha || t.fecha) && h("span", { class: "suave" }, ` · ${t.fecha ? formatearFecha(t.fecha) : "sin fecha"}`),
         o.meta && h("span", { class: "suave" }, ` · ${o.meta}`)),
-      t.repeticion && h("p", { class: "suave repeticion" }, `↻ ${describirRepeticion(t.repeticion)}`),
+      reglaValida(t.repeticion) && h("p", { class: "suave repeticion" }, `↻ ${describirRepeticion(t.repeticion)}`),
       t.nota && h("p", { class: "suave nota" }, t.nota),
       o.acciones && h("div", { class: "acciones" }, ...o.acciones));
   }
@@ -367,7 +367,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const fecha = h("input", { type: "date", id: "tarea-fecha", "aria-label": "Fecha", value: previo("tarea-fecha", t?.fecha ?? "") }) as HTMLInputElement;
     const nota = h("textarea", { id: "tarea-nota", rows: 2, "aria-label": "Nota" }, previo("tarea-nota", t?.nota ?? "")) as HTMLTextAreaElement;
     const metaLabel = select("tarea-meta", "Meta", opcionesMeta, previo("tarea-meta", t?.meta_id ?? ""), "Sin meta");
-    const rep = t?.repeticion ?? null;
+    const rep = reglaValida(t?.repeticion);
     const tipoRep = h("select", { id: "tarea-repetir", "aria-label": "Repetir" },
       h("option", { value: "no" }, "No"), h("option", { value: "diaria" }, "Todos los días"),
       h("option", { value: "semanal" }, "Ciertos días de la semana"), h("option", { value: "mensual" }, "Un día del mes")) as HTMLSelectElement;
