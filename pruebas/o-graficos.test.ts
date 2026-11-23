@@ -223,7 +223,7 @@ describe("O23: dibujo con SVG propio", () => {
       await calificarYGuardar(almacen, reloj, t.id, "bien");
       await marcarHecha(almacen, reloj, (await crearTarea(almacen, reloj, { titulo: "Hecha" })).id);
     }
-    const app: AppMontada = montarApp(raiz as unknown as HTMLElement, { almacen, reloj, persistencia: new Memoria() });
+    const app: AppMontada = montarApp(raiz as unknown as HTMLElement, { almacen, reloj, persistencia: new Memoria() }, "hoy");
     await app.esperar();
     const doc = ventana.document;
     const boton = () => doc.querySelector("#ver-estadisticas") as unknown as HTMLButtonElement;
@@ -294,7 +294,7 @@ describe("O23: datos dañados no rompen Hoy", () => {
       d = new Map<string, string>();
       getItem(k: string) { return this.d.get(k) ?? null; }
       setItem(k: string, v: string) { this.d.set(k, v); }
-    })() });
+    })() }, "hoy");
     await app.esperar();
     const doc = ventana.document;
     (doc.querySelector("#ver-estadisticas") as unknown as HTMLButtonElement).click();

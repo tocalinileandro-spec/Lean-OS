@@ -30,7 +30,7 @@ async function abrir(fabrica: IDBFactory, persistencia: Persistencia, reloj: Rel
   const raiz = ventana.document.createElement("div");
   ventana.document.body.append(raiz);
   const almacen = await AlmacenIndexedDB.abrir("lean-os-ui", fabrica);
-  const app: AppMontada = montarApp(raiz as unknown as HTMLElement, { almacen, reloj, persistencia });
+  const app: AppMontada = montarApp(raiz as unknown as HTMLElement, { almacen, reloj, persistencia }, "hoy");
   await app.esperar();
   const doc = ventana.document;
   const botonPorTexto = (t: string) => [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith(t));

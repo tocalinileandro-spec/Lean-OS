@@ -12,6 +12,7 @@ import { calcularEstadisticas, type Estadisticas } from "../../compartido/estadi
 import { normalizar } from "../../compartido/normalizar.ts";
 import { tareasDeHoy } from "../../compartido/tareas.ts";
 import { calificar, construirCola, SesionRepaso } from "../../compartido/repaso.ts";
+import { colaDeRepaso } from "../../compartido/areas.ts";
 import type { Reloj } from "../../compartido/reloj.ts";
 import type { ControlSync } from "../sync/motor.ts";
 
@@ -51,12 +52,24 @@ export function textoIntervalo(dias: number): string {
 /** Nunca se muestra un error técnico crudo: mensaje en castellano que dice qué hacer. */
 export function mensajeDeError(error: unknown): string {
   const t = error instanceof Error ? error.message : "";
+  if (MENSAJES_DE_AREAS.test(t)) return t;
   if (/no puede (quedar|estar) (vacía|vacío)/.test(t)) return t.replace(/^Error:\s*/, "") + ". Completalo y volvé a guardar.";
   if (/^(Fecha inválida|El año no es válido)/.test(t)) return "La fecha o el año no son válidos. Revisalos y volvé a guardar.";
   if (/^(Elegí al menos un día|Los días de la semana|Hay días de la semana|El día del mes|La regla de repetición|El tipo de repetición)/.test(t)) return `${t}. Revisalo y volvé a guardar.`;
   return "No se pudo completar la acción. Probá de nuevo; si sigue fallando, recargá la página (tus datos están guardados).";
 }
 
+/** Mensajes en castellano de `areas.ts` (crear, mover, borrar y restaurar): ya dicen qué pasó y qué hacer, se muestran tal cual. */
+const MENSAJES_DE_AREAS = /^(El nombre de la (área|subárea)|El área (elegida )?no existe|El área no está|El tema no (existe|está)|El tema ya está|El destino no existe|Una subárea no puede|Esa es (una subárea|un área)|Ya no está en la papelera|Para restaurar (el tema|la subárea))/;
+
+const DIAS_LARGOS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+/** "Domingo 22 de noviembre" para el encabezado de Áreas. */
+export function fechaLarga(iso: FechaISO): string {
+  const [a, m, dia] = iso.split("-").map(Number) as [number, number, number];
+  const semana = new Date(Date.UTC(a, m - 1, dia)).getUTCDay();
+  return `${DIAS_LARGOS[semana]} ${dia} de ${MESES_LARGOS[m - 1]}`;
+}
 export const ETIQUETAS: Record<Calificacion, string> = { otra_vez: "Otra vez", dificil: "Difícil", bien: "Bien", facil: "Fácil" };
 
 // ---------- Ajustes ----------
@@ -191,9 +204,10 @@ export class PantallaRepaso {
 
   private constructor(private d: Dependencias, private sesion: SesionRepaso) {}
 
-  static async iniciar(d: Dependencias): Promise<PantallaRepaso> {
+  /** `areaId` filtra la cola por esa área (incluye sus subáreas; una subárea solo lo suyo); el tope de nuevas se aplica antes. */
+  static async iniciar(d: Dependencias, filtro: { areaId?: Id | null } = {}): Promise<PantallaRepaso> {
     const aj = cargarAjustes(d.persistencia);
-    const cola = await construirCola(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia });
+    const cola = await colaDeRepaso(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia, areaId: filtro.areaId ?? null });
     return new PantallaRepaso(d, new SesionRepaso(d.almacen, d.reloj, cola));
   }
 

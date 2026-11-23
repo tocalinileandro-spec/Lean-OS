@@ -14,12 +14,16 @@ import {
   borrarMeta, borrarTarea, cambiarEstadoMeta, crearMetaAnual, crearMetaTrimestral, crearTarea, crearTareaRapida, desmarcarHecha,
   detenerRepeticion, editarTarea, marcarHecha,
 } from "../../compartido/tareas.ts";
+import {
+  borrarArea, borrarSubarea, borrarTema, crearArea, detalleArea, moverTema, resumenAreas, resumenDeBorrado, restaurarArea, restaurarTema,
+  type GrupoDeTemas, type TemaDeArea,
+} from "../../compartido/areas.ts";
 import { diaLogico } from "../../compartido/dia.ts";
 import type { ControlSync } from "../sync/motor.ts";
 import { describirRepeticion, reglaValida, type Repeticion } from "../../compartido/recurrencia.ts";
 import { TIPOS_APUNTE, type Apunte, type Calificacion, type EstadoMeta, type Id, type Tarea, type Tarjeta, type TipoApunte, type Trimestre } from "../../compartido/esquema.ts";
 import {
-  agruparTarjetas, aplicarTema, cargarAjustes, cargarTema, cantidadParaRepasar, formatearFecha, guardarAjustes, guardarTema, mensajeDeError, nombreDeArea,
+  agruparTarjetas, aplicarTema, cargarAjustes, cargarTema, cantidadParaRepasar, fechaLarga, formatearFecha, guardarAjustes, guardarTema, mensajeDeError, nombreDeArea,
   opcionesDeArea, PantallaRepaso, TEMAS, validarAjustes, vistaHoy, type Tema, type Dependencias, type VistaRepaso,
 } from "./logica.ts";
 import {
@@ -34,15 +38,18 @@ import { renderizarMarkdown } from "./markdown.ts";
 import { detalleEstado, formatearInstante, textoEstado } from "../sync/estado.ts";
 import { exportarLocal, importarRespaldo, lineasDeInforme, type InformeRespaldo } from "../sync/respaldo.ts";
 
-export type Pantalla = "hoy" | "repaso" | "tareas" | "apuntes" | "tarjetas" | "ajustes";
-/** Pestañas de la navegación. "Áreas" lleva por ahora a la pantalla de tarjetas (la pantalla de áreas llega en otra tarea). */
+export type Pantalla = "areas" | "hoy" | "repaso" | "tareas" | "apuntes" | "tarjetas" | "ajustes";
+/** Pestañas de la navegación. "Áreas" es la pantalla de inicio (y el detalle de un área); Tarjetas (gestión) se abre desde Áreas y deja activa esa pestaña. */
 const PESTANAS: { id: Pantalla; titulo: string; icono: NombreIcono }[] = [
-  { id: "hoy", titulo: "Hoy", icono: "hoy" }, { id: "repaso", titulo: "Repaso", icono: "repaso" }, { id: "tarjetas", titulo: "Áreas", icono: "areas" },
+  { id: "hoy", titulo: "Hoy", icono: "hoy" }, { id: "repaso", titulo: "Repaso", icono: "repaso" }, { id: "areas", titulo: "Áreas", icono: "areas" },
   { id: "tareas", titulo: "Tareas", icono: "tareas" }, { id: "apuntes", titulo: "Apuntes", icono: "apuntes" },
 ];
 const TIPOS_NOMBRE: Record<TipoApunte, string> = { idea: "Idea", apunte: "Apunte", aprendizaje: "Aprendizaje" };
 /** Campos que conservan el foco al redibujar (se está escribiendo en ellos). */
 const CAMPOS_CON_FOCO = ["busqueda", "busqueda-apuntes", "tarea-rapida", "ver-estadisticas"];
+/** Cantidad de colores de la paleta cíclica de las áreas (clases `.area-c0` a `.area-c5` en el CSS). */
+const COLORES_DE_AREA = 6;
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
 type Hijo = Node | string | null | false | undefined;
 type Props = Record<string, string | number | boolean | ((ev: Event) => void) | undefined>;
@@ -54,7 +61,7 @@ export interface AppMontada {
   raiz: HTMLElement;
 }
 
-export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla = "hoy"): AppMontada {
+export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla = "areas"): AppMontada {
   const doc = raiz.ownerDocument;
 
   function h(tag: string, props: Props = {}, ...hijos: Hijo[]): HTMLElement {
@@ -80,6 +87,18 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   let textoImport = "";
   let informe: InformeImportacion | null = null;
   let papelera = false;
+  // Áreas: área abierta (detalle), menú de tema, resumen, mover, confirmación de borrado y "Deshacer".
+  let areaAbierta: Id | null = null;
+  let menuTema: Id | null = null;
+  let resumenAbierto: Id | null = null;
+  let moviendo: Id | null = null;
+  interface Confirmacion { tipo: "tema" | "subarea" | "area"; id: Id; nombre: string }
+  let confirmando: Confirmacion | null = null;
+  let deshacerBorrado: { texto: string; restaurar: () => Promise<void> } | null = null;
+  /** Mensaje en castellano pegado al formulario o fila donde ocurrió (clave = dónde). */
+  let mensajeLocal: { clave: string; texto: string } | null = null;
+  /** Id del elemento que recibe el foco después del próximo dibujo. */
+  let focoEn: string | null = null;
   let editando: Id | null = null;
   let errorAjustes = "";
   let tareaEnForm: Id | "nueva" | null = null;
@@ -126,7 +145,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   /** Serializa las acciones: una a la vez, y siempre se redibuja al final. */
   function accion(f: () => Promise<void> | void): void {
     cola = cola.then(async () => {
-      aviso = ""; errorAjustes = "";
+      aviso = ""; errorAjustes = ""; mensajeLocal = null;
       const antes = firmaForm();
       await f();
       if (firmaForm() !== antes) recuerdo.clear(); // se cerró o cambió el formulario: lo escrito ya no vale
@@ -138,14 +157,38 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     cola = cola.then(dibujar);
   }
 
+  /** Cierra menús, formularios y avisos propios de Áreas (al cambiar de pantalla o de área). */
+  function limpiarAreas(): void {
+    areaAbierta = null; menuTema = null; resumenAbierto = null; moviendo = null; confirmando = null; deshacerBorrado = null; mensajeLocal = null;
+  }
+
   function ir(p: Pantalla): void {
     panelEstadisticas = false;
     if (p !== "apuntes") grabadora?.detener(true);
     accion(async () => {
       pantalla = p;
       aviso = "";
+      limpiarAreas();
       repaso = p === "repaso" ? await PantallaRepaso.iniciar(d) : null;
     });
+  }
+
+  function abrirArea(id: Id): void {
+    accion(() => { pantalla = "areas"; repaso = null; limpiarAreas(); areaAbierta = id; focoEn = "titulo-pantalla"; });
+  }
+
+  function volverAAreas(): void {
+    accion(() => { limpiarAreas(); focoEn = "titulo-pantalla"; });
+  }
+
+  /** Repaso filtrado por un área (o subárea). */
+  function repasarArea(areaId: Id): void {
+    accion(async () => { pantalla = "repaso"; limpiarAreas(); repaso = await PantallaRepaso.iniciar(d, { areaId }); });
+  }
+
+  /** Abre Tarjetas con la caja de importar. */
+  function abrirImportar(): void {
+    accion(() => { pantalla = "tarjetas"; repaso = null; limpiarAreas(); importAbierto = true; });
   }
 
   // ---------- estructura ----------
@@ -207,7 +250,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     let pendientesRepaso = 0;
     try { pendientesRepaso = await cantidadParaRepasar(d); } catch { /* sin insignia si no se pueden contar */ }
     nav.replaceChildren(...PESTANAS.map((p) =>
-      h("button", { type: "button", class: "nav-item", "aria-current": p.id === pantalla ? "page" : undefined, onclick: () => ir(p.id) },
+      h("button", { type: "button", class: "nav-item", "aria-current": p.id === pantalla || (p.id === "areas" && pantalla === "tarjetas") ? "page" : undefined, onclick: () => ir(p.id) },
         h("span", { class: "nav-icono" }, crearIcono(doc, p.icono)),
         h("span", { class: "nav-texto" }, p.titulo),
         p.id === "repaso" && pendientesRepaso > 0 && h("span", { class: "insignia", "aria-label": `${pendientesRepaso} pendientes` }, String(pendientesRepaso)))));
@@ -219,7 +262,8 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     if (!capturaAbierta || pantalla !== "apuntes") capturaConsultada = false;
     else if (!capturaConsultada) { capturaConsultada = true; await cargarAudio(); }
     try {
-      if (pantalla === "hoy") contenido.push(await dibujarHoy());
+      if (pantalla === "areas") contenido.push(await dibujarAreas());
+      else if (pantalla === "hoy") contenido.push(await dibujarHoy());
       else if (pantalla === "repaso") contenido.push(await dibujarRepaso());
       else if (pantalla === "tareas") contenido.push(await dibujarTareas());
       else if (pantalla === "apuntes") contenido.push(await dibujarApuntes());
@@ -235,13 +279,272 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     principal.replaceChildren(...contenido.filter((x): x is Node => !!x));
     dibujarDetalleSync();
     // Si se estaba escribiendo en un campo (búsqueda), se conserva el foco; si no, va a la acción principal.
-    const mismo = idActivo ? principal.querySelector<HTMLInputElement>(`#${idActivo}`) : null;
-    if (mismo && CAMPOS_CON_FOCO.includes(mismo.id)) {
+    const mismo = idActivo ? principal.querySelector<HTMLInputElement>(`[id="${idActivo}"]`) : null;
+    const pedido = focoEn ? principal.querySelector<HTMLElement>(`[id="${focoEn}"]`) : null;
+    focoEn = null;
+    if (pedido) {
+      pedido.focus();
+    } else if (mismo && (CAMPOS_CON_FOCO.includes(mismo.id) || mismo.id.startsWith("a-"))) {
       mismo.focus();
       mismo.setSelectionRange?.(mismo.value.length, mismo.value.length);
     } else {
       principal.querySelector<HTMLElement>("[data-foco]")?.focus?.();
     }
+  }
+
+  // ---------- Áreas (inicio) y detalle de área ----------
+  const claseColor = (i: number) => `area-c${i % COLORES_DE_AREA}`;
+  const inicialDe = (nombre: string) => ([...nombre.trim()][0] ?? "?").toUpperCase();
+  const mensajeDe = (clave: string): Node | null => (mensajeLocal?.clave === clave ? h("p", { class: "aviso", role: "alert" }, mensajeLocal.texto) : null);
+  const botonConIcono = (texto: string, icono: NombreIcono, onclick: () => void, clase: string, extra: Props = {}) =>
+    h("button", { type: "button", class: `boton ${clase}`.trim(), onclick: () => onclick(), ...extra }, texto, crearIcono(doc, icono));
+
+  /** "Se van a la papelera" ya hecho: aviso con "Deshacer" (restaura el conjunto con el mismo instante de borrado). */
+  function avisoDeshacer(): Node | null {
+    const b = deshacerBorrado;
+    if (!b) return null;
+    return h("div", { class: "aviso aviso-accion", role: "status" },
+      h("span", {}, b.texto),
+      boton("Deshacer", () => accion(async () => { deshacerBorrado = null; await b.restaurar(); focoEn = "titulo-pantalla"; }), "suave chico", { id: "a-deshacer" }));
+  }
+
+  /** Campo de nombre + botón para crear un área o una subárea. Enter también crea; si falla o está repetida, lo escrito queda. */
+  function formularioNuevo(o: { id: string; etiqueta: string; placeholder: string; boton: string; padreId: Id | null }): Node {
+    const campo = h("input", { type: "text", id: o.id, placeholder: o.placeholder, autocomplete: "off", value: previo(o.id, ""), maxlength: 120 }) as HTMLInputElement;
+    const crear = () => accion(async () => {
+      recordar(campo);
+      try {
+        const r = await crearArea(d.almacen, d.reloj, campo.value, o.padreId);
+        if (!r.creada) { mensajeLocal = { clave: o.id, texto: r.aviso ?? "Ya existe." }; focoEn = o.id; return; }
+        recuerdo.delete(o.id);
+        if (o.padreId === null) { limpiarAreas(); areaAbierta = r.area.id; focoEn = "titulo-pantalla"; aviso = `Área “${r.area.nombre}” creada.`; }
+        else { aviso = `Subárea “${r.area.nombre}” creada.`; focoEn = o.id; }
+      } catch (e) {
+        mensajeLocal = { clave: o.id, texto: mensajeDeError(e) };
+        focoEn = o.id;
+      }
+    });
+    campo.addEventListener("keydown", (ev) => {
+      const ke = ev as KeyboardEvent;
+      if (ke.key !== "Enter" || ke.isComposing) return;
+      ke.preventDefault();
+      crear();
+    });
+    return recordando(h("div", { class: "formulario-nuevo", role: "group", "aria-label": o.etiqueta },
+      h("span", { class: "formulario-icono" }, crearIcono(doc, "mas")),
+      h("label", { for: o.id }, o.etiqueta),
+      campo,
+      boton(o.boton, crear, "oscuro"),
+      mensajeDe(o.id)));
+  }
+
+  async function dibujarAreas(): Promise<Node> {
+    if (areaAbierta) {
+      const a = await d.almacen.areas.obtener(areaAbierta);
+      if (a && a.deleted_at === null) return dibujarDetalleArea(areaAbierta);
+      areaAbierta = null; // ya no existe (por ejemplo, la borraron desde otro dispositivo)
+    }
+    const aj = cargarAjustes(d.persistencia);
+    const r = await resumenAreas(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia });
+    const totalTarjetas = r.areas.reduce((n, a) => n + a.tarjetas, 0);
+    const subtitulo = r.areas.length === 0
+      ? "Todavía no tenés áreas."
+      : `${plural(totalTarjetas, "tarjeta", "tarjetas")} en ${plural(r.areas.length, "área", "áreas")}. Elegí una para estudiarla o repasá todo lo de hoy.`;
+    const encabezado = h("div", { class: "encabezado-pantalla" },
+      h("div", {},
+        h("p", { class: "fecha-pantalla" }, fechaLarga(diaLogico(d.reloj))),
+        h("h1", { id: "titulo-pantalla", tabindex: "-1" }, "Tus áreas"),
+        h("p", { class: "suave subtitulo" }, subtitulo)),
+      r.totalParaHoy > 0 && botonConIcono(`Repasar hoy · ${r.totalParaHoy}`, "siguiente", () => ir("repaso"), "principal grande-cta", { id: "a-repasar-hoy" }));
+    if (r.areas.length === 0) {
+      return h("section", { class: "pantalla-areas" }, encabezado, avisoDeshacer(),
+        h("div", { class: "vacio-areas" },
+          h("p", {}, "Cada área junta los temas que estudiás, por ejemplo Programación o Idiomas. Creá la primera o importá tarjetas ya armadas."),
+          formularioNuevo({ id: "a-nueva-area", etiqueta: "Nueva área", placeholder: "Ej: Finanzas, Idiomas…", boton: "Crear área", padreId: null }),
+          boton("Importar", abrirImportar, "suave", { id: "a-importar" })));
+    }
+    const tarjetas = r.areas.map((a, i) => h("li", { class: `area-tarjeta ${claseColor(i)}` },
+      h("div", { class: "area-cabeza" },
+        h("span", { class: "area-inicial", "aria-hidden": "true" }, a.inicial),
+        h("span", { class: `insignia-estado ${a.paraHoy > 0 ? "estado-hoy" : "estado-aldia"}` }, a.paraHoy > 0 ? `${a.paraHoy} para hoy` : "Al día")),
+      h("h2", { class: "area-nombre" },
+        h("button", { type: "button", class: "area-abrir", id: `a-abrir-${a.id}`, onclick: () => abrirArea(a.id) }, a.nombre)),
+      h("p", { class: "suave area-detalle" }, `${plural(a.tarjetas, "tarjeta", "tarjetas")} · ${plural(a.subareas.length, "subárea", "subáreas")}`),
+      a.subareas.length > 0 && h("ul", { class: "etiquetas-sub", "aria-label": `Subáreas de ${a.nombre}` }, ...a.subareas.map((n) => h("li", {}, n))),
+      h("div", { class: "area-dominio" },
+        h("div", { class: "area-dominio-texto" }, h("span", { id: `a-dominio-${a.id}` }, "Dominadas"), h("strong", {}, `${a.dominio}%`)),
+        h("progress", { role: "progressbar", max: 100, value: a.dominio, "aria-labelledby": `a-dominio-${a.id}`, "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": a.dominio, "aria-valuetext": `${a.dominio}%` }))));
+    return h("section", { class: "pantalla-areas" }, encabezado, avisoDeshacer(),
+      h("ul", { class: "areas-grilla" }, ...tarjetas),
+      formularioNuevo({ id: "a-nueva-area", etiqueta: "Nueva área", placeholder: "Ej: Finanzas, Idiomas…", boton: "Crear área", padreId: null }),
+      h("div", { class: "barra" }, boton("Ver todas las tarjetas", () => ir("tarjetas"), "suave", { id: "a-ver-tarjetas" })));
+  }
+
+  /** A dónde vuelve el foco al cerrar con Escape o Cancelar lo que abrió ese elemento. */
+  const disparadorDe = (c: Confirmacion): string => (c.tipo === "tema" ? `a-menu-${c.id}` : c.tipo === "subarea" ? `a-borrar-sub-${c.id}` : "a-borrar-area");
+
+  function pedirConfirmacion(c: Confirmacion): void {
+    accion(() => { confirmando = c; menuTema = null; focoEn = `a-confirmar-no-${c.id}`; });
+  }
+
+  function confirmarBorrado(c: Confirmacion): void {
+    accion(async () => {
+      confirmando = null; menuTema = null; moviendo = null;
+      if (c.tipo === "tema") {
+        await borrarTema(d.almacen, d.reloj, c.id);
+        deshacerBorrado = {
+          texto: `Tema “${c.nombre}” quedó en la papelera 30 días.`,
+          restaurar: async () => { await restaurarTema(d.almacen, d.reloj, c.id); aviso = `Tema “${c.nombre}” restaurado con sus tarjetas y su resumen.`; },
+        };
+      } else if (c.tipo === "subarea") {
+        await borrarSubarea(d.almacen, d.reloj, c.id);
+        deshacerBorrado = {
+          texto: `Subárea “${c.nombre}” quedó en la papelera 30 días.`,
+          restaurar: async () => { await restaurarArea(d.almacen, d.reloj, c.id); aviso = `Subárea “${c.nombre}” restaurada con todo lo que tenía.`; },
+        };
+      } else {
+        await borrarArea(d.almacen, d.reloj, c.id);
+        areaAbierta = null; // vuelve a Áreas
+        deshacerBorrado = {
+          texto: `Área “${c.nombre}” quedó en la papelera 30 días.`,
+          restaurar: async () => { await restaurarArea(d.almacen, d.reloj, c.id); areaAbierta = c.id; aviso = `Área “${c.nombre}” restaurada con todo lo que tenía.`; },
+        };
+      }
+      focoEn = "titulo-pantalla";
+    });
+  }
+
+  /** Pregunta de confirmación en el lugar, con lo que se va (de `resumenDeBorrado`). */
+  function nodoConfirmacion(c: Confirmacion, texto: string): Node {
+    const que = c.tipo === "tema" ? "el tema" : c.tipo === "subarea" ? "la subárea" : "el área";
+    return h("div", { class: "confirmacion", role: "alert", id: `a-confirmar-${c.id}` },
+      h("p", {}, h("strong", {}, `¿Borrar ${que} “${c.nombre}”?`), ` ${texto}`),
+      h("div", { class: "acciones" },
+        boton("Mover a la papelera", () => confirmarBorrado(c), "peligro", { id: `a-confirmar-si-${c.id}` }),
+        boton("Cancelar", () => accion(() => { confirmando = null; focoEn = disparadorDe(c); }), "suave", { id: `a-confirmar-no-${c.id}` })));
+  }
+
+  function filaTema(t: TemaDeArea, areaActual: Id, destinos: { id: Id; nombre: string }[], confirmacion: Node | null): Node {
+    const abierto = menuTema === t.id;
+    const idMenu = `a-menu-${t.id}`;
+    const botonMenu = h("button", {
+      type: "button", class: "boton-icono", id: idMenu, "aria-label": `Más opciones de ${t.nombre}`, "aria-expanded": abierto ? "true" : "false", "aria-controls": `a-opciones-${t.id}`,
+      onclick: () => accion(() => { menuTema = abierto ? null : t.id; focoEn = abierto ? idMenu : `a-ver-resumen-${t.id}`; }),
+    }, crearIcono(doc, "tres-puntos"));
+    const menu = abierto && h("div", { class: "menu-opciones", id: `a-opciones-${t.id}`, role: "group", "aria-label": `Opciones de ${t.nombre}` },
+      boton("Ver el resumen", () => accion(() => { resumenAbierto = resumenAbierto === t.id ? null : t.id; menuTema = null; focoEn = idMenu; }), "suave chico", { id: `a-ver-resumen-${t.id}` }),
+      boton("Mover…", () => accion(() => { moviendo = t.id; menuTema = null; focoEn = `a-mover-destino-${t.id}`; }), "suave chico"),
+      boton("Borrar tema", () => pedirConfirmacion({ tipo: "tema", id: t.id, nombre: t.nombre }), "peligro chico"));
+    const resumen = resumenAbierto === t.id && h("div", { class: "resumen-tema", id: `a-resumen-${t.id}` },
+      h("h3", {}, `Resumen de ${t.nombre}`),
+      t.resumen ? renderizarMarkdown(doc, t.resumen) : h("p", { class: "suave" }, "Este tema no tiene resumen."),
+      boton("Cerrar resumen", () => accion(() => { resumenAbierto = null; focoEn = idMenu; }), "suave chico"));
+    return h("li", { class: "fila-tema" },
+      h("div", { class: "fila-tema-linea" },
+        h("div", { class: "fila-tema-texto" }, h("div", { class: "fila-tema-nombre" }, t.nombre), h("div", { class: "suave fila-tema-detalle" }, plural(t.tarjetas, "tarjeta", "tarjetas"))),
+        h("span", { class: `insignia-estado estado-${t.estado === "hoy" ? "hoy" : t.estado === "nuevo" ? "nuevo" : "aldia"}` }, t.estadoTexto),
+        botonMenu),
+      menu, resumen,
+      moviendo === t.id && formularioMover(t, areaActual, destinos),
+      confirmacion);
+  }
+
+  function formularioMover(t: TemaDeArea, areaActual: Id, destinos: { id: Id; nombre: string }[]): Node {
+    const idSel = `a-mover-destino-${t.id}`;
+    const sel = h("select", { id: idSel, "aria-label": `Mover “${t.nombre}” a` },
+      ...destinos.map((o) => h("option", { value: o.id }, o.id === areaActual ? `${o.nombre} (está acá)` : o.nombre))) as HTMLSelectElement;
+    sel.value = previo(idSel, destinos.find((o) => o.id !== areaActual)?.id ?? areaActual);
+    const cerrar = () => { recuerdo.delete(idSel); moviendo = null; focoEn = `a-menu-${t.id}`; };
+    return recordando(h("div", { class: "mover-tema", role: "group", "aria-label": `Mover ${t.nombre}` },
+      h("label", { for: idSel }, `Mover “${t.nombre}” a`),
+      sel,
+      h("div", { class: "acciones" },
+        boton("Mover", () => accion(async () => {
+          recordar(sel);
+          const destino = destinos.find((o) => o.id === sel.value);
+          try {
+            const r = await moverTema(d.almacen, d.reloj, t.id, sel.value);
+            recuerdo.delete(idSel);
+            moviendo = null;
+            aviso = `Se movió “${t.nombre}” a “${destino?.nombre ?? "el destino"}” con ${plural(r.tarjetas, "tarjeta", "tarjetas")}: conservan su estado de repaso.`;
+            focoEn = "titulo-pantalla";
+          } catch (e) {
+            mensajeLocal = { clave: `mover:${t.id}`, texto: mensajeDeError(e) };
+            focoEn = idSel;
+          }
+        }), "principal chico"),
+        boton("Cancelar", () => accion(cerrar), "suave chico")),
+      mensajeDe(`mover:${t.id}`)));
+  }
+
+  function seccionGrupo(g: GrupoDeTemas, o: { titulo: string; esSubarea: boolean; conRepasar: boolean; destinos: { id: Id; nombre: string }[]; textoConfirmacion: string }): Node {
+    const idTitulo = `a-seccion-${g.areaId}`;
+    const confirmacionTema = (t: TemaDeArea) => (confirmando?.tipo === "tema" && confirmando.id === t.id ? nodoConfirmacion(confirmando, o.textoConfirmacion) : null);
+    const hayAlgo = g.temas.length > 0 || g.tarjetasSueltas > 0;
+    return h("section", { class: "seccion-area", "aria-labelledby": idTitulo },
+      h("div", { class: "seccion-cabeza" },
+        h("div", {},
+          h("h2", { id: idTitulo }, o.titulo),
+          h("p", { class: "suave" }, `${plural(g.tarjetas, "tarjeta", "tarjetas")} · ${plural(g.temas.length, "tema", "temas")}`)),
+        o.conRepasar && g.paraHoy > 0 && boton(`Repasar · ${g.paraHoy}`, () => repasarArea(g.areaId), "suave chico", { "aria-label": `Repasar ${o.titulo} · ${g.paraHoy}` })),
+      hayAlgo
+        ? h("ul", { class: "lista-temas" },
+            ...g.temas.map((t) => filaTema(t, g.areaId, o.destinos, confirmacionTema(t))),
+            g.tarjetasSueltas > 0 && h("li", { class: "fila-tema" },
+              h("div", { class: "fila-tema-linea" },
+                h("div", { class: "fila-tema-texto" }, h("div", { class: "fila-tema-nombre" }, "Tarjetas sueltas"), h("div", { class: "suave fila-tema-detalle" }, plural(g.tarjetasSueltas, "tarjeta", "tarjetas"))))))
+        : h("p", { class: "suave" }, "Todavía no hay temas acá. Importá tarjetas para empezar."),
+      o.esSubarea && h("div", { class: "acciones pie-seccion" },
+        boton("Borrar subárea", () => pedirConfirmacion({ tipo: "subarea", id: g.areaId, nombre: g.nombre }), "peligro chico", { id: `a-borrar-sub-${g.areaId}`, "aria-label": `Borrar subárea ${g.nombre}` })),
+      o.esSubarea && confirmando?.tipo === "subarea" && confirmando.id === g.areaId && nodoConfirmacion(confirmando, o.textoConfirmacion));
+  }
+
+  async function dibujarDetalleArea(id: Id): Promise<Node> {
+    const aj = cargarAjustes(d.persistencia);
+    const det = await detalleArea(d.almacen, d.reloj, id, { limiteNuevas: aj.nuevasPorDia });
+    const todas = await d.almacen.areas.listar();
+    const raices = todas.filter((a) => a.padre_id === null).sort((x, y) => x.nombre.localeCompare(y.nombre, "es"));
+    const raizId = det.padreId ?? det.id;
+    const indice = Math.max(0, raices.findIndex((a) => a.id === raizId));
+    // Destinos de "Mover…": todas las áreas y subáreas vivas.
+    const destinos = raices.flatMap((r) => [
+      { id: r.id, nombre: r.nombre },
+      ...todas.filter((s) => s.padre_id === r.id).sort((x, y) => x.nombre.localeCompare(y.nombre, "es")).map((s) => ({ id: s.id, nombre: `${r.nombre} › ${s.nombre}` })),
+    ]);
+    // Texto de la confirmación (lo que se va a la papelera); si el objetivo ya no existe, se cierra.
+    let textoConfirmacion = "";
+    if (confirmando) {
+      try { textoConfirmacion = (await resumenDeBorrado(d.almacen, { tipo: confirmando.tipo === "tema" ? "tema" : "area", id: confirmando.id })).texto; } catch { confirmando = null; }
+    }
+    const grupoPropio = det.propio.temas.length > 0 || det.propio.tarjetasSueltas > 0 || det.subareas.length === 0;
+    const esRaiz = det.padreId === null;
+    const secciones = [
+      ...(grupoPropio ? [seccionGrupo(det.propio, {
+        titulo: det.subareas.length > 0 ? `${det.nombre} (sin subárea)` : det.nombre, esSubarea: false, conRepasar: det.subareas.length === 0, destinos, textoConfirmacion,
+      })] : []),
+      ...det.subareas.map((g) => seccionGrupo(g, { titulo: g.nombre, esSubarea: true, conRepasar: true, destinos, textoConfirmacion })),
+    ];
+    return h("section", { class: `pantalla-detalle ${claseColor(indice)}` },
+      h("button", { type: "button", class: "enlace-volver", id: "a-volver", onclick: volverAAreas }, crearIcono(doc, "volver"), "Todas las áreas"),
+      h("div", { class: "encabezado-pantalla" },
+        h("div", { class: "detalle-titulo" },
+          h("span", { class: "area-inicial grande", "aria-hidden": "true" }, inicialDe(det.nombre)),
+          h("div", {},
+            h("h1", { id: "titulo-pantalla", tabindex: "-1" }, det.titulo),
+            h("p", { class: "suave subtitulo" }, `${plural(det.tarjetas, "tarjeta", "tarjetas")} · ${plural(det.subareas.length, "subárea", "subáreas")} · ${det.paraHoy} para repasar hoy`))),
+        h("div", { class: "acciones" },
+          det.paraHoy > 0 && boton(`Repasar esta área · ${det.paraHoy}`, () => repasarArea(det.id), "principal", { id: "a-repasar-area" }),
+          boton("Importar tarjetas", abrirImportar, "suave", { id: "a-importar" }))),
+      avisoDeshacer(),
+      h("div", { class: "secciones-area" }, ...secciones),
+      esRaiz && formularioNuevo({ id: "a-nueva-subarea", etiqueta: "Nueva subárea", placeholder: "Ej: Python, Bases de datos…", boton: "Crear", padreId: det.id }),
+      h("div", { class: "nota-papelera" }, crearIcono(doc, "papelera"),
+        h("p", {}, h("strong", {}, "Papelera:"), " lo que borres queda 30 días y podés restaurarlo desde Tarjetas, en “Ver papelera”.")),
+      esRaiz && h("section", { class: "zona-peligro", "aria-labelledby": "a-zona-peligro" },
+        h("h2", { id: "a-zona-peligro" }, "Zona de peligro"),
+        h("p", { class: "suave" }, "Borrar el área manda a la papelera sus subáreas, temas y tarjetas. Podés deshacerlo durante 30 días."),
+        boton("Borrar área", () => pedirConfirmacion({ tipo: "area", id: det.id, nombre: det.nombre }), "peligro", { id: "a-borrar-area" }),
+        confirmando?.tipo === "area" && confirmando.id === det.id && nodoConfirmacion(confirmando, textoConfirmacion)));
   }
 
   // ---------- Hoy ----------
@@ -805,7 +1108,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       partes.push(h("h2", {}, "Papelera"), enPapelera.length === 0
         ? h("p", { class: "suave" }, "La papelera está vacía.")
         : h("ul", { class: "lista" }, ...enPapelera.map((i) => h("li", {},
-            h("span", {}, h("em", {}, `${nombreTipoPapelera(i.tipo)}: `), i.titulo),
+            h("span", {}, h("em", {}, `${nombreTipoPapelera(i.tipo)}: `), i.titulo, i.detalle && h("span", { class: "suave" }, ` (${i.detalle})`)),
             boton("Restaurar", () => accion(async () => { aviso = await restaurarItem(d, i.tipo, i.id); }), "suave chico")))),
         h("p", { class: "suave" }, "Lo que está en la papelera se elimina a los 30 días."));
     }
@@ -1101,6 +1404,19 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   doc.addEventListener("keydown", (ev) => {
     if ((ev as KeyboardEvent).key !== "Escape" || pantalla !== "hoy" || !panelEstadisticas) return;
     accion(() => { panelEstadisticas = false; });
+  });
+
+  // Escape cierra el menú, el resumen, el formulario de mover y la confirmación de borrado de Áreas.
+  doc.addEventListener("keydown", (ev) => {
+    if ((ev as KeyboardEvent).key !== "Escape" || pantalla !== "areas") return;
+    if (!menuTema && !resumenAbierto && !moviendo && !confirmando) return;
+    accion(() => {
+      const c = confirmando;
+      const tema = menuTema ?? moviendo ?? resumenAbierto;
+      focoEn = c ? disparadorDe(c) : tema ? `a-menu-${tema}` : null;
+      if (moviendo) recuerdo.delete(`a-mover-destino-${moviendo}`);
+      menuTema = null; resumenAbierto = null; moviendo = null; confirmando = null;
+    });
   });
 
   // Atajo de captura rápida: "n" fuera de los campos de texto abre la caja de apuntes.

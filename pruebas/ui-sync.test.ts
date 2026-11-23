@@ -20,7 +20,7 @@ async function abrirUI(e: Entorno) {
     almacen: c.almacen, reloj: e.reloj, persistencia: c.persistencia, sync: c.motor,
     descargar: (nombre, texto) => { descargas.push({ nombre, texto }); },
     leerArchivo: async () => textoArchivo,
-  });
+  }, "hoy");
   await app.esperar();
   const doc = ventana.document;
   const quieto = async () => {
