@@ -4,6 +4,7 @@
  * `contenido_updated_at`; el estado de repaso no se toca acá.
  */
 import type { Almacen } from "./almacen.ts";
+import { conjuntosEnPapelera, type ConjuntoPapelera } from "./areas.ts";
 import { diaLogico } from "./dia.ts";
 import { DIAS_PAPELERA, EASE_INICIAL, type Apunte, type Id, type Meta, type Tarea, type Tarjeta } from "./esquema.ts";
 import { resolverArea } from "./importacion/importar.ts";
@@ -100,6 +101,8 @@ export async function borrarApunte(almacen: Almacen, reloj: Reloj, id: Id): Prom
 }
 
 export interface Papelera {
+  /** Temas, subáreas y áreas borrados: UN item por conjunto (sus tarjetas y apuntes no aparecen sueltos). */
+  conjuntos: ConjuntoPapelera[];
   tarjetas: Tarjeta[];
   apuntes: Apunte[];
   metas: Meta[];
@@ -109,9 +112,12 @@ export interface Papelera {
 /** Lo borrado y todavía no purgado. */
 export async function listarPapelera(almacen: Almacen): Promise<Papelera> {
   const borrado = <T extends { deleted_at: string | null }>(x: T) => x.deleted_at !== null;
+  const conjuntos = await conjuntosEnPapelera(almacen);
+  const enConjunto = new Set(conjuntos.flatMap((c) => [...c.idsTarjetas, ...c.idsApuntes]));
   return {
-    tarjetas: (await almacen.tarjetas.listar({ incluirBorrados: true })).filter(borrado),
-    apuntes: (await almacen.apuntes.listar({ incluirBorrados: true })).filter(borrado),
+    conjuntos,
+    tarjetas: (await almacen.tarjetas.listar({ incluirBorrados: true })).filter((x) => borrado(x) && !enConjunto.has(x.id)),
+    apuntes: (await almacen.apuntes.listar({ incluirBorrados: true })).filter((x) => borrado(x) && !enConjunto.has(x.id)),
     metas: (await almacen.metas.listar({ incluirBorrados: true })).filter(borrado),
     tareas: (await almacen.tareas.listar({ incluirBorrados: true })).filter(borrado),
   };
@@ -142,7 +148,7 @@ export async function purgarPapelera(almacen: Almacen, reloj: Reloj): Promise<nu
   const limite = reloj.ahora().getTime() - DIAS_PAPELERA * 86_400_000;
   const vencido = (x: { deleted_at: string | null }) => x.deleted_at !== null && new Date(x.deleted_at).getTime() <= limite;
   let total = 0;
-  for (const repo of [almacen.tarjetas, almacen.apuntes, almacen.importaciones, almacen.metas, almacen.tareas]) {
+  for (const repo of [almacen.tarjetas, almacen.apuntes, almacen.importaciones, almacen.areas, almacen.metas, almacen.tareas]) {
     const ids = (await repo.listar({ incluirBorrados: true })).filter(vencido).map((x) => x.id);
     await repo.eliminarDefinitivo(ids);
     total += ids.length;
