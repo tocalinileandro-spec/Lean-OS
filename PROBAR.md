@@ -98,3 +98,16 @@ Es la misma app empaquetada en un solo archivo, `Lean-OS.exe` (no instala nada y
 
 Sin la clave de Groq (ver `SECRETOS.md`, sección 5) la app anda igual y Ajustes dice "falta configurar". Para probarla en tu PC: corré el servidor con la variable `GROQ_API_KEY` cargada en tu terminal (no en el repositorio), entrá, activá el interruptor en Ajustes > "Entrada por audio (opcional)" y en Apuntes > "Nuevo apunte" tocá "Micrófono". El texto aparece en la caja y no se guarda hasta que toques "Guardar apunte". Las pruebas automáticas (O7 a O12) usan un proveedor simulado y no llaman a Groq.
 
+## 10. Probar a mano lo nuevo (áreas, repaso, migración, tema)
+
+Con la app abierta en http://localhost:8080:
+
+1. **Áreas:** es la pantalla de inicio. Tocá **Crear área** y escribí un nombre; se abre su detalle. Ahí creás una subárea. Repetir un nombre avisa "Ya existe".
+2. **Importar con revisión:** en Áreas tocá **Importar**, pegá un bloque de `prototipo\ejemplos\aprendizaje_ejemplo.json`, tocá **Revisar** (ves qué tarjetas son nuevas y cuáles duplicadas) y luego **Confirmar importación**.
+3. **Temas:** en el detalle de un área, los tres puntos de un tema permiten ver el resumen, mover a otra área (las tarjetas conservan su avance) o borrar. Borrar pide confirmación y deja un aviso con **Deshacer**; también se restaura desde Tarjetas > Ver papelera.
+4. **Repaso:** tocá **Repasar hoy**. Los chips filtran por área y subárea; arriba de la pregunta ves "Área › Subárea · Tema". Atajos: Espacio muestra la respuesta, 1 a 4 califican, Ctrl+Z deshace.
+5. **Migración:** en el Lean OS original tocá **Exportar todo** (baja un ZIP). Acá, **Ajustes > Importar respaldo del Lean OS original** y elegí el ZIP. Repetilo: tiene que decir que no hay tarjetas nuevas. (Hay un ZIP de ejemplo en `pruebas\fixtures\respaldo-original.zip`.)
+6. **Tema:** Ajustes > Apariencia: Sistema, Claro u Oscuro. Se recuerda al recargar.
+7. **Celular:** achicá la ventana a unos 390 px o abrila en el teléfono: la barra de pestañas queda abajo, sin scroll horizontal y con botones cómodos.
+8. **Sin regresión:** exportá todo (Ajustes > Respaldo), abrí la app en otro navegador, importá ese respaldo y comprobá que están las mismas tarjetas, áreas y tareas. Con sesión iniciada en los dos, lo que borrás en uno (por ejemplo un área entera) aparece borrado en el otro.
+9. **Capturas:** `npm run capturas` (necesita Playwright global) deja las imágenes en `docs\capturas\`.
