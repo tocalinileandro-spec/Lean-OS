@@ -26,7 +26,7 @@ import { describirRepeticion, reglaValida, type Repeticion } from "../../compart
 import { TIPOS_APUNTE, type Apunte, type Calificacion, type EstadoMeta, type Id, type Tarea, type Tarjeta, type TipoApunte, type Trimestre } from "../../compartido/esquema.ts";
 import {
   agruparTarjetas, aplicarTema, cargarAjustes, cargarTema, cantidadParaRepasar, fechaLarga, formatearFecha, guardarAjustes, guardarTema, mensajeDeError, nombreDeArea,
-  lineasDeMigracion, opcionesDeArea, PantallaRepaso, TEMAS, validarAjustes, vistaHoy, type Tema, type Dependencias, type VistaRepaso,
+  lineasDeMigracion, opcionesDeArea, PantallaRepaso, saludoDelDia, TEMAS, validarAjustes, vistaHoy, type Tema, type Dependencias, type VistaRepaso,
 } from "./logica.ts";
 import {
   ESTADOS_META, etiquetaMeta, itemsPapelera, nombreTipoPapelera, restaurarItem, separarEtiquetas, textoProgreso,
@@ -243,6 +243,10 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const partes = [`Estado: ${textoEstado(e)}.`, detalleEstado(e)];
     if (e.ultimaVez) partes.push(`Última sincronización: ${formatearInstante(e.ultimaVez)}.`);
     el.textContent = partes.join(" ");
+    for (const ins of principal.querySelectorAll<HTMLElement>(".insignia-sync")) {
+      ins.className = `insignia-estado insignia-sync ${e.fase === "sincronizado" ? "estado-aldia" : e.fase === "error" || e.fase === "sesion_vencida" || e.fase === "confirmacion_pendiente" ? "estado-error" : "estado-nuevo"}`;
+      ins.textContent = textoEstado(e);
+    }
   }
 
   if (d.sync) {
@@ -319,6 +323,19 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   const mensajeDe = (clave: string): Node | null => (mensajeLocal?.clave === clave ? h("p", { class: "aviso", role: "alert" }, mensajeLocal.texto) : null);
   const botonConIcono = (texto: string, icono: NombreIcono, onclick: () => void, clase: string, extra: Props = {}) =>
     h("button", { type: "button", class: `boton ${clase}`.trim(), onclick: () => onclick(), ...extra }, texto, crearIcono(doc, icono));
+
+  /** Encabezado de pantalla: fecha opcional, el único h1, subtítulo y la acción principal a la derecha. */
+  const encabezado = (titulo: string, subtitulo: string, o: { fecha?: string; accion?: Hijo } = {}) =>
+    h("div", { class: "encabezado-pantalla" },
+      h("div", {}, o.fecha && h("p", { class: "fecha-pantalla" }, o.fecha), h("h1", {}, titulo), subtitulo && h("p", { class: "suave subtitulo" }, subtitulo)),
+      o.accion);
+  /** Estado vacío: ícono sobrio, el mensaje y, si hay, la acción. */
+  const vacioConIcono = (icono: NombreIcono, texto: string, accionVacia?: Hijo) =>
+    h("div", { class: "vacio-estado" }, h("span", { class: "vacio-icono", "aria-hidden": "true" }, crearIcono(doc, icono)), h("p", {}, texto), accionVacia);
+  /** Campo de búsqueda pastilla con la lupa a la izquierda. */
+  const conLupa = (campo: HTMLElement) => h("div", { class: "buscador" }, h("span", { class: "buscador-icono", "aria-hidden": "true" }, crearIcono(doc, "buscar")), campo);
+  /** Bloque de pantalla con su h2. */
+  const bloque = (titulo: string, ...hijos: Hijo[]) => h("section", { class: "bloque" }, h("h2", {}, titulo), ...hijos);
 
   /** "Se van a la papelera" ya hecho: aviso con "Deshacer" (restaura el conjunto con el mismo instante de borrado). */
   function avisoDeshacer(): Node | null {
@@ -573,44 +590,46 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const v = await vistaHoy(d);
     const e = v.estadisticas;
     const rapida = h("input", {
-      type: "text", id: "tarea-rapida", placeholder: "Tarea rápida: escribí el título y apretá Enter", "aria-label": "Tarea rápida", autocomplete: "off",
+      type: "text", id: "tarea-rapida", class: "campo-pastilla", placeholder: "Tarea rápida: escribí el título y apretá Enter", "aria-label": "Tarea rápida", autocomplete: "off",
       onkeydown: (ev: Event) => {
         const ke = ev as KeyboardEvent;
         if (ke.key !== "Enter" || ke.isComposing) return;
         ke.preventDefault();
-        const campo = ke.target as HTMLInputElement;
-        const titulo = campo.value;
-        if (!titulo.trim()) return;
-        campo.value = ""; // un segundo Enter seguido ya no encuentra nada para crear
-        accion(async () => { await crearTareaRapida(d.almacen, d.reloj, titulo); });
+        crearRapida();
       },
-    });
-    return h("section", {},
-      h("h1", {}, "Hoy"),
-      h("p", { class: "suave" }, v.fecha),
-      v.atrasadas.length > 0 && h("div", { class: "atrasadas", role: "region", "aria-label": "Tareas atrasadas" },
-        h("h2", {}, `Atrasadas (${v.atrasadas.length})`),
-        h("ul", { class: "lista tareas" }, ...v.atrasadas.map((t) => filaTarea(t, { fecha: true })))),
-      h("h2", {}, "Tareas de hoy"),
-      rapida,
-      v.tareas.length === 0
-        ? h("p", { class: "suave" }, "No tenés tareas para hoy. Escribí una arriba y apretá Enter.")
-        : h("ul", { class: "lista tareas" }, ...v.tareas.map((t) => filaTarea(t, {}))),
-      h("div", { class: "acceso-fijo" },
-        v.pendientes > 0
-          ? boton(`Repasar ${v.pendientes} ${v.pendientes === 1 ? "tarjeta" : "tarjetas"}`, () => ir("repaso"), "grande principal", { "data-foco": "1" })
-          : h("div", { class: "vacio" },
-              h("p", {}, "No tenés tarjetas pendientes por ahora."),
-              boton("Ir a Tarjetas", () => ir("tarjetas"), "suave", { "data-foco": "1" }))),
+    }) as HTMLInputElement;
+    function crearRapida(): void {
+      const titulo = rapida.value;
+      if (!titulo.trim()) return;
+      rapida.value = ""; // un segundo Enter seguido ya no encuentra nada para crear
+      accion(async () => { await crearTareaRapida(d.almacen, d.reloj, titulo); });
+    }
+    const tareasHoy = v.atrasadas.length + v.tareas.length;
+    const partes = [tareasHoy > 0 && plural(tareasHoy, "tarea", "tareas"), v.pendientes > 0 && plural(v.pendientes, "tarjeta", "tarjetas")].filter(Boolean);
+    const resumen = partes.length > 0 ? `Tenés ${partes.join(" y ")} para hoy.` : "No tenés nada pendiente para hoy.";
+    const repasar = v.pendientes > 0
+      ? h("div", { class: "acceso-fijo" },
+          botonConIcono(`Repasar ${v.pendientes} ${v.pendientes === 1 ? "tarjeta" : "tarjetas"}`, "siguiente", () => ir("repaso"), "principal grande-cta", { "data-foco": "1" }))
+      : null;
+    return h("section", { class: `pantalla-hoy${repasar ? " con-acceso" : ""}` },
+      encabezado("Hoy", `${saludoDelDia(d.reloj.ahora())}. ${resumen}`, { fecha: `${fechaLarga(diaLogico(d.reloj))} · ${v.fecha}`, accion: repasar }),
       h("dl", { class: "estadisticas" },
         h("div", {}, h("dt", {}, "Pendientes hoy"), h("dd", {}, String(e.pendientesHoy))),
         h("div", {}, h("dt", {}, "Repasadas hoy"), h("dd", {}, String(e.repasadasHoy))),
         h("div", {}, h("dt", {}, "Racha"), h("dd", {}, `${e.racha} ${e.racha === 1 ? "día" : "días"}`))),
-      boton(panelEstadisticas ? "Ocultar estadísticas" : "Ver estadísticas", () => { accion(() => { panelEstadisticas = !panelEstadisticas; }); }, "suave",
+      v.atrasadas.length > 0 && h("div", { class: "atrasadas", role: "region", "aria-label": "Tareas atrasadas" },
+        h("h2", {}, `Atrasadas (${v.atrasadas.length})`),
+        h("ul", { class: "lista tareas" }, ...v.atrasadas.map((t) => filaTarea(t, { fecha: true })))),
+      bloque("Tareas de hoy",
+        h("div", { class: "tarea-rapida" }, rapida, botonConIcono("Agregar", "mas", crearRapida, "principal", { id: "tarea-rapida-agregar" })),
+        v.tareas.length === 0
+          ? vacioConIcono("tareas", "No tenés tareas para hoy. Escribí una arriba y apretá Enter.")
+          : h("ul", { class: "lista tareas" }, ...v.tareas.map((t) => filaTarea(t, {})))),
+      !repasar && vacioConIcono("repaso", "No tenés tarjetas pendientes por ahora.", boton("Ir a Tarjetas", () => ir("tarjetas"), "suave", { "data-foco": "1" })),
+      botonConIcono(panelEstadisticas ? "Ocultar estadísticas" : "Ver estadísticas", "grafico", () => { accion(() => { panelEstadisticas = !panelEstadisticas; }); }, "suave boton-estadisticas",
         { id: "ver-estadisticas", "aria-expanded": panelEstadisticas ? "true" : "false", "aria-controls": "panel-estadisticas" }),
       panelEstadisticas && await dibujarPanelEstadisticas(e),
-      e.porArea.length > 0 && h("div", {},
-        h("h2", {}, "Tarjetas por área"),
+      e.porArea.length > 0 && bloque("Tarjetas por área",
         h("ul", { class: "lista" }, ...e.porArea.map((a) => h("li", {}, h("span", {}, a.nombre), h("strong", {}, String(a.total)))))));
   }
 
@@ -619,25 +638,30 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     return h("section", { id: "panel-estadisticas", class: "panel-estadisticas", "aria-label": "Estadísticas" },
       h("h2", {}, "Estadísticas"),
       h("p", { class: "suave" }, `Pendientes hoy: ${e.pendientesHoy}. Repasadas hoy: ${e.repasadasHoy}. Racha: ${e.racha} ${e.racha === 1 ? "día" : "días"}.`),
-      graficoRepasosPorDia(doc, g.repasosPorDia),
-      graficoRetencion(doc, g.retencion),
-      graficoTarjetasPorArea(doc, g.porArea),
-      graficoTareasPorSemana(doc, g.tareasPorSemana));
+      h("div", { class: "graficos" },
+        graficoRepasosPorDia(doc, g.repasosPorDia),
+        graficoRetencion(doc, g.retencion),
+        graficoTarjetasPorArea(doc, g.porArea),
+        graficoTareasPorSemana(doc, g.tareasPorSemana)));
   }
 
-  /** Fila de tarea con su tilde (marca o desmarca al instante). */
+  /** Fila de tarea con su tilde de 44 px (marca o desmarca al instante), fecha, meta e insignia de repetición. */
   function filaTarea(t: Tarea, o: { fecha?: boolean; acciones?: Hijo[]; meta?: string | undefined }): Node {
     const hecha = t.estado === "hecha";
+    const datos: Hijo[] = [
+      (o.fecha || t.fecha) && h("span", { class: `dato${o.fecha ? " dato-atrasado" : ""}` }, t.fecha ? formatearFecha(t.fecha) : "sin fecha"),
+      o.meta && h("span", { class: "dato dato-meta" }, o.meta),
+      reglaValida(t.repeticion) && h("span", { class: "dato dato-repite repeticion" }, `↻ ${describirRepeticion(t.repeticion)}`),
+    ];
     return h("li", { class: hecha ? "hecha" : "" },
       h("label", { class: "tilde" },
         h("input", {
-          type: "checkbox", checked: hecha, "aria-label": `${hecha ? "Desmarcar" : "Marcar como hecha"}: ${t.titulo}`,
+          type: "checkbox", class: "casilla", checked: hecha, "aria-label": `${hecha ? "Desmarcar" : "Marcar como hecha"}: ${t.titulo}`,
           onclick: () => accion(async () => { await (hecha ? desmarcarHecha : marcarHecha)(d.almacen, d.reloj, t.id); }),
         }),
-        h("span", { class: "texto" }, t.titulo),
-        (o.fecha || t.fecha) && h("span", { class: "suave" }, ` · ${t.fecha ? formatearFecha(t.fecha) : "sin fecha"}`),
-        o.meta && h("span", { class: "suave" }, ` · ${o.meta}`)),
-      reglaValida(t.repeticion) && h("p", { class: "suave repeticion" }, `↻ ${describirRepeticion(t.repeticion)}`),
+        h("span", { class: "fila-cuerpo" },
+          h("span", { class: "texto" }, t.titulo),
+          datos.some(Boolean) && h("span", { class: "fila-meta" }, ...datos))),
       t.nota && h("p", { class: "suave nota" }, t.nota),
       o.acciones && h("div", { class: "acciones" }, ...o.acciones));
   }
@@ -764,22 +788,24 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
             }), "peligro chico"),
           ],
         });
-    const lista = (ts: Tarea[], vacio: string) => ts.length === 0 ? h("p", { class: "suave" }, vacio) : h("ul", { class: "lista tareas" }, ...ts.map(fila));
-    return h("section", {},
-      h("h1", {}, "Tareas"),
-      h("div", { class: "barra" }, boton("Nueva tarea", () => accion(() => { tareaEnForm = tareaEnForm === "nueva" ? null : "nueva"; }), "principal")),
+    const lista = (ts: Tarea[], vacio: string) => ts.length === 0 ? vacioConIcono("tareas", vacio) : h("ul", { class: "lista tareas" }, ...ts.map(fila));
+    const pendientes = v.bandeja.length + v.conFecha.length;
+    return h("section", { class: "pantalla-tareas" },
+      encabezado("Tareas", pendientes === 0 ? "No tenés tareas pendientes." : `${plural(pendientes, "tarea pendiente", "tareas pendientes")}, y tus metas con su progreso.`, {
+        accion: botonConIcono("Nueva tarea", "mas", () => accion(() => { tareaEnForm = tareaEnForm === "nueva" ? null : "nueva"; }), "principal grande-cta"),
+      }),
       tareaEnForm === "nueva" && h("ul", { class: "lista" }, formularioTarea(null, opcionesMeta)),
-      h("h2", {}, "Bandeja (sin fecha)"),
-      lista(v.bandeja, "La bandeja está vacía."),
-      h("h2", {}, "Con fecha"),
-      lista(v.conFecha, "No hay tareas pendientes con fecha."),
-      v.hechas.length > 0 && h("div", {}, h("h2", {}, "Hechas"), lista(v.hechas, "")),
-      h("h2", {}, "Metas"),
-      h("div", { class: "barra" },
-        boton("Nueva meta anual", () => accion(() => { formMeta = formMeta === "anual" ? null : "anual"; }), "suave"),
-        boton("Nueva meta trimestral", () => accion(() => { formMeta = formMeta === "trimestral" ? null : "trimestral"; }), "suave")),
-      formMeta && formularioMeta(formMeta, v.metas.filter((m) => m.meta.tipo === "anual")),
-      v.metas.length === 0 ? h("p", { class: "suave" }, "Todavía no hay metas.") : h("ul", { class: "lista metas" }, ...v.metas.map(filaMeta)));
+      bloque("Bandeja (sin fecha)", lista(v.bandeja, "La bandeja está vacía.")),
+      bloque("Con fecha", lista(v.conFecha, "No hay tareas pendientes con fecha.")),
+      v.hechas.length > 0 && bloque("Hechas", lista(v.hechas, "")),
+      h("section", { class: "bloque" },
+        h("div", { class: "seccion-linea" },
+          h("h2", {}, "Metas"),
+          h("div", { class: "acciones" },
+            botonConIcono("Nueva meta anual", "objetivo", () => accion(() => { formMeta = formMeta === "anual" ? null : "anual"; }), "suave"),
+            botonConIcono("Nueva meta trimestral", "objetivo", () => accion(() => { formMeta = formMeta === "trimestral" ? null : "trimestral"; }), "suave"))),
+        formMeta && formularioMeta(formMeta, v.metas.filter((m) => m.meta.tipo === "anual")),
+        v.metas.length === 0 ? vacioConIcono("objetivo", "Todavía no hay metas.") : h("ul", { class: "lista metas" }, ...v.metas.map(filaMeta))));
   }
 
   function formularioTarea(t: Tarea | null, opcionesMeta: { id: Id; nombre: string }[]): Node {
@@ -796,7 +822,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const casillas = NOMBRES_DIAS.map((n, i) => {
       const c = h("input", { type: "checkbox", id: `tarea-repetir-dia-${i + 1}`, "aria-label": ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"][i]! }) as HTMLInputElement;
       c.checked = previo(c.id, rep?.tipo === "semanal" && rep.dias.includes(i + 1) ? "1" : "") === "1";
-      return h("label", { class: "tilde" }, c, n);
+      return h("label", { class: "chip-dia" }, c, h("span", { class: "opcion" }, n));
     });
     const diaMes = h("input", {
       type: "number", id: "tarea-repetir-dia-mes", "aria-label": "Día del mes", min: 1, max: 31,
@@ -823,7 +849,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       aviso = t ? "Cambios guardados." : "Tarea guardada.";
     });
     const detalleRep = h("div", { class: "repeticion-detalle" },
-      tipoRep.value === "semanal" ? h("div", { role: "group", "aria-label": "Días de la semana" }, ...casillas) : null,
+      tipoRep.value === "semanal" ? h("div", { role: "group", "aria-label": "Días de la semana", class: "dias-semana" }, ...casillas) : null,
       tipoRep.value === "mensual" ? h("label", {}, "Día del mes (1 a 31)", diaMes) : null);
     const form = recordando(h("li", { class: "edicion" },
       h("label", {}, "Título", titulo), h("label", {}, "Fecha (opcional)", fecha), metaLabel, h("label", {}, "Nota (opcional)", nota),
@@ -875,8 +901,8 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     estado.addEventListener("change", () => accion(async () => { await cambiarEstadoMeta(d.almacen, d.reloj, m.meta.id, estado.value as EstadoMeta); }));
     return h("li", { class: `meta meta-${m.meta.estado}` },
       h("div", { class: "texto" },
-        h("strong", {}, m.etiqueta), h("span", { class: "suave" }, m.meta.tipo === "anual" ? " · anual" : " · trimestral"),
-        h("div", { class: "progreso" }, h("progress", { max: 100, value: m.progreso.porcentaje, "aria-label": "Progreso" }), h("span", { class: "suave" }, ` ${textoProgreso(m.progreso)}`))),
+        h("div", { class: "meta-titulo" }, h("strong", {}, m.etiqueta), h("span", { class: "dato" }, m.meta.tipo === "anual" ? "anual" : "trimestral")),
+        h("div", { class: "progreso" }, h("progress", { max: 100, value: m.progreso.porcentaje, "aria-label": "Progreso" }), h("span", { class: "suave" }, textoProgreso(m.progreso)))),
       h("div", { class: "acciones" }, estado,
         boton("Borrar meta", () => accion(async () => {
           await borrarMeta(d.almacen, d.reloj, m.meta.id);
@@ -893,7 +919,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const v = await vistaApuntes(d, f);
     const filtrando = !!(filtros.texto || filtros.tipo || filtros.etiqueta || filtros.area);
     const buscador = h("input", {
-      type: "search", id: "busqueda-apuntes", placeholder: "Buscar en los apuntes", value: filtros.texto, "aria-label": "Buscar apuntes",
+      type: "search", id: "busqueda-apuntes", class: "campo-pastilla", placeholder: "Buscar en los apuntes", value: filtros.texto, "aria-label": "Buscar apuntes",
       oninput: (ev: Event) => { filtros.texto = (ev.target as HTMLInputElement).value; accion(() => undefined); },
     });
     const filtro = (id: string, clave: "tipo" | "etiqueta" | "area", etiqueta: string, ops: { id: string; nombre: string }[], todos: string) => {
@@ -901,18 +927,20 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       l.querySelector("select")!.addEventListener("change", (ev) => { filtros[clave] = (ev.target as HTMLSelectElement).value; accion(() => undefined); });
       return l;
     };
-    return h("section", {},
-      h("h1", {}, "Apuntes"),
-      h("div", { class: "barra" }, boton("Nuevo apunte", () => accion(() => { capturaAbierta = !capturaAbierta; }), "principal", { title: "Atajo: tecla n" })),
+    return h("section", { class: "pantalla-apuntes" },
+      encabezado("Apuntes", "Capturá ideas y apuntes en el momento; después buscalos, editalos o pasalos a tarea o tarjeta.", {
+        accion: botonConIcono("Nuevo apunte", "mas", () => accion(() => { capturaAbierta = !capturaAbierta; }), "principal grande-cta", { title: "Atajo: tecla n" }),
+      }),
       capturaAbierta && dibujarCaptura(),
       borradorTarjeta && formularioTarjeta(borradorTarjeta.b, v.areas),
-      buscador,
-      h("div", { class: "filtros" },
-        filtro("filtro-tipo", "tipo", "Tipo", TIPOS_APUNTE.map((t) => ({ id: t, nombre: TIPOS_NOMBRE[t] })), "Todos"),
-        filtro("filtro-etiqueta", "etiqueta", "Etiqueta", v.etiquetas.map((e) => ({ id: e, nombre: e })), "Todas"),
-        filtro("filtro-area", "area", "Área", v.areas, "Todas")),
+      h("div", { class: "barra-busqueda" },
+        conLupa(buscador),
+        h("div", { class: "filtros" },
+          filtro("filtro-tipo", "tipo", "Tipo", TIPOS_APUNTE.map((t) => ({ id: t, nombre: TIPOS_NOMBRE[t] })), "Todos"),
+          filtro("filtro-etiqueta", "etiqueta", "Etiqueta", v.etiquetas.map((e) => ({ id: e, nombre: e })), "Todas"),
+          filtro("filtro-area", "area", "Área", v.areas, "Todas"))),
       v.apuntes.length === 0
-        ? h("p", { class: "suave" }, filtrando ? "No hay apuntes que coincidan con la búsqueda." : "Todavía no hay apuntes. Tocá “Nuevo apunte” (o la tecla n) y escribí.")
+        ? vacioConIcono("apuntes", filtrando ? "No hay apuntes que coincidan con la búsqueda." : "Todavía no hay apuntes. Tocá “Nuevo apunte” (o la tecla n) y escribí.")
         : h("ul", { class: "lista apuntes" }, ...v.apuntes.map((a) => (apunteEnEdicion === a.id ? formularioApunte(a, v.areas) : filaApunte(a, v.areas)))));
   }
 
@@ -934,7 +962,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       const ke = ev as KeyboardEvent;
       if (ke.key === "Enter" && (ke.ctrlKey || ke.metaKey)) { ke.preventDefault(); guardar(); }
     });
-    return h("div", { class: "captura" }, caja,
+    return h("div", { class: "captura panel" }, caja,
       h("div", { class: "acciones" },
         boton("Guardar apunte", guardar, "principal"),
         ...botonesAudio(),
@@ -977,7 +1005,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     if (motivo === null) return [];
     if (faseAudio === "grabando") return [boton("Parar", () => grabadora?.detener(false), "chico", { id: "captura-parar" })];
     const ocupado = faseAudio !== "";
-    return [boton("Micrófono", () => { void grabar(); }, "suave chico", { id: "captura-mic", ...(motivo !== "" || ocupado ? { disabled: true } : {}) })];
+    return [botonConIcono("Micrófono", "microfono", () => { void grabar(); }, "suave chico", { id: "captura-mic", ...(motivo !== "" || ocupado ? { disabled: true } : {}) })];
   }
 
   function textoEstadoAudio(): Node | null {
@@ -1098,11 +1126,13 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
 
   function filaApunte(a: Apunte, areas: { id: Id; nombre: string }[]): Node {
     const area = a.area_id ? areas.find((x) => x.id === a.area_id)?.nombre : undefined;
-    const datos = [TIPOS_NOMBRE[a.tipo], area, formatearFecha(diaDe(a.created_at)), ...a.etiquetas.map((e) => `#${e}`)].filter(Boolean).join(" · ");
     return h("li", { class: "apunte" },
       h("div", { class: "texto" },
-        h("strong", {}, tituloApunte(a)),
-        h("div", { class: "suave" }, datos),
+        h("div", { class: "apunte-cabeza" },
+          h("span", { class: `insignia-estado tipo-${a.tipo}` }, TIPOS_NOMBRE[a.tipo]),
+          h("strong", { class: "apunte-titulo" }, tituloApunte(a))),
+        h("div", { class: "suave apunte-datos" }, [area, formatearFecha(diaDe(a.created_at))].filter(Boolean).join(" · ")),
+        a.etiquetas.length > 0 && h("ul", { class: "etiquetas-sub", "aria-label": "Etiquetas" }, ...a.etiquetas.map((e) => h("li", {}, `#${e}`))),
         renderizarMarkdown(doc, a.texto)),
       h("div", { class: "acciones" },
         boton("Editar", () => accion(() => { apunteEnEdicion = a.id; }), "suave chico"),
@@ -1149,7 +1179,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const pista = h("input", { type: "text", id: "tarjeta-pista", "aria-label": "Pista", value: previo("tarjeta-pista", b.pista ?? "") }) as HTMLInputElement;
     const area = select("tarjeta-area", "Área", areas, previo("tarjeta-area", b.area_id ?? ""), "Elegí un área");
     const nueva = h("input", { type: "text", id: "tarjeta-area-nueva", "aria-label": "Área nueva", value: previo("tarjeta-area-nueva", ""), placeholder: "Por ejemplo: Programación > CS50" }) as HTMLInputElement;
-    return recordando(h("div", { class: "edicion" },
+    return recordando(h("div", { class: "edicion panel" },
       h("h2", {}, "Nueva tarjeta desde el apunte"),
       h("label", {}, "Pregunta", pregunta), h("label", {}, "Respuesta", respuesta), h("label", {}, "Pista (opcional)", pista), area,
       h("label", {}, "O escribí un área nueva (opcional)", nueva),
@@ -1169,43 +1199,47 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   // ---------- Tarjetas ----------
   async function dibujarTarjetas(): Promise<Node> {
     const buscador = h("input", {
-      type: "search", id: "busqueda", placeholder: "Buscar en las tarjetas", value: busqueda, "aria-label": "Buscar tarjetas",
+      type: "search", id: "busqueda", class: "campo-pastilla", placeholder: "Buscar en las tarjetas", value: busqueda, "aria-label": "Buscar tarjetas",
       oninput: (ev: Event) => { busqueda = (ev.target as HTMLInputElement).value; accion(() => undefined); },
     });
     const enPapelera = await itemsPapelera(d);
     const partes: Hijo[] = [
-      h("h1", {}, "Tarjetas"),
-      h("div", { class: "barra" },
-        boton(importAbierto ? "Cerrar importación" : "Importar", () => accion(() => {
+      encabezado("Tarjetas", "Buscá, editá, suspendé o borrá tus tarjetas, agrupadas por área.", {
+        accion: botonConIcono(importAbierto ? "Cerrar importación" : "Importar", "mas", () => accion(() => {
           importAbierto = !importAbierto;
           limpiarResultadosImportar();
           textoImport = ""; // abrir o cerrar la caja empieza de cero: nada de la vez anterior
-        }), "principal"),
+        }), "principal grande-cta"),
+      }),
+      h("div", { class: "barra" },
         boton("Deshacer última importación", () => accion(async () => {
           const r = await deshacerUltimaImportacion(d.almacen, d.reloj);
           limpiarResultadosImportar();
           aviso = r ? `Se deshizo la última importación: ${r.tarjetas} ${r.tarjetas === 1 ? "tarjeta pasó" : "tarjetas pasaron"} a la papelera.` : "No hay ninguna importación para deshacer.";
         }), "suave"),
-        boton(`${papelera ? "Ocultar" : "Ver"} papelera (${enPapelera.length})`, () => accion(() => { papelera = !papelera; }), "suave")),
+        botonConIcono(`${papelera ? "Ocultar" : "Ver"} papelera (${enPapelera.length})`, "papelera", () => accion(() => { papelera = !papelera; }), "suave")),
       importAbierto && await dibujarImportar(),
-      buscador,
+      conLupa(buscador),
     ];
     if (papelera) {
-      partes.push(h("h2", {}, "Papelera"), enPapelera.length === 0
-        ? h("p", { class: "suave" }, "La papelera está vacía.")
-        : h("ul", { class: "lista" }, ...enPapelera.map((i) => h("li", {},
-            h("span", {}, h("em", {}, `${nombreTipoPapelera(i.tipo)}: `), i.titulo, i.detalle && h("span", { class: "suave" }, ` (${i.detalle})`)),
+      partes.push(bloque("Papelera", enPapelera.length === 0
+        ? vacioConIcono("papelera", "La papelera está vacía.")
+        : h("ul", { class: "lista papelera" }, ...enPapelera.map((i) => h("li", {},
+            h("span", { class: "texto" }, h("em", {}, `${nombreTipoPapelera(i.tipo)}: `), i.titulo, i.detalle && h("span", { class: "suave" }, ` (${i.detalle})`)),
             boton("Restaurar", () => accion(async () => { aviso = await restaurarItem(d, i.tipo, i.id); }), "suave chico")))),
-        h("p", { class: "suave" }, "Lo que está en la papelera se elimina a los 30 días."));
+        h("p", { class: "suave" }, "Lo que está en la papelera se elimina a los 30 días.")));
     }
     const grupos = await agruparTarjetas(d.almacen, busqueda);
     const opciones = await opcionesDeArea(d.almacen);
-    if (grupos.length === 0) partes.push(h("p", { class: "suave" }, busqueda ? "No hay tarjetas que coincidan con la búsqueda." : "Todavía no hay tarjetas. Tocá “Importar” y pegá el JSON."));
-    for (const g of grupos) {
-      partes.push(h("h2", { class: "grupo" }, g.nombre),
-        h("ul", { class: "lista tarjetas" }, ...g.tarjetas.map((t) => (editando === t.id ? formularioEdicion(t, opciones) : filaTarjeta(t)))));
+    if (grupos.length === 0) {
+      partes.push(vacioConIcono("repaso", busqueda ? "No hay tarjetas que coincidan con la búsqueda." : "Todavía no hay tarjetas. Tocá “Importar” y pegá el JSON."));
     }
-    return h("section", {}, ...partes);
+    for (const g of grupos) {
+      partes.push(h("section", { class: "grupo-tarjetas" },
+        h("div", { class: "grupo-cabeza" }, h("h2", { class: "grupo" }, g.nombre), h("span", { class: "insignia-estado estado-nuevo" }, plural(g.tarjetas.length, "tarjeta", "tarjetas"))),
+        h("ul", { class: "lista tarjetas" }, ...g.tarjetas.map((t) => (editando === t.id ? formularioEdicion(t, opciones) : filaTarjeta(t))))));
+    }
+    return h("section", { class: "pantalla-tarjetas" }, ...partes);
   }
 
   /** Tarjeta de vista previa de un bloque (qué pasaría al confirmar). */
@@ -1288,8 +1322,10 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
 
   function filaTarjeta(t: Tarjeta): Node {
     return h("li", { class: t.suspendida ? "suspendida" : "" },
-      h("div", { class: "texto" }, h("span", {}, t.pregunta), t.suspendida && h("em", {}, " (suspendida)"),
-        h("span", { class: "suave" }, ` · vence ${formatearFecha(t.vence)}`)),
+      h("div", { class: "texto" }, h("span", { class: "tarjeta-pregunta" }, t.pregunta),
+        h("span", { class: "fila-meta" },
+          t.suspendida && h("em", { class: "insignia-estado estado-aviso" }, "(suspendida)"),
+          h("span", { class: "dato" }, `vence ${formatearFecha(t.vence)}`))),
       h("div", { class: "acciones" },
         boton("Editar", () => accion(() => { editando = t.id; }), "suave chico"),
         boton(t.suspendida ? "Reanudar" : "Suspender", () => accion(async () => {
@@ -1330,18 +1366,23 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     });
     nuevas.addEventListener("change", guardar);
     hora.addEventListener("change", guardar);
-    return h("section", {},
-      h("h1", {}, "Ajustes"),
-      h("label", {}, "Tarjetas nuevas por día", nuevas),
-      h("label", {}, "Hora de cambio de día", hora),
-      h("p", { class: "suave" }, "A esa hora empieza el día nuevo para el repaso. Los cambios se guardan solos."),
-      dibujarTema(),
-      errorAjustes && h("p", { class: "aviso", role: "alert" }, errorAjustes),
-      d.sync && dibujarCuenta(d.sync),
-      dibujarRespaldo(),
-      dibujarMigracion(),
-      d.sync && dibujarExterno(d.sync),
-      d.sync && dibujarAudioAjustes(d.sync));
+    return h("section", { class: "pantalla-ajustes" },
+      encabezado("Ajustes", "Cómo estudiás, cómo se ve la app y dónde viven tus datos. Los cambios se guardan solos."),
+      h("div", { class: "ajustes-grilla" },
+        h("section", { class: "panel ajuste" },
+          h("h2", {}, "Estudio"),
+          h("p", { class: "suave" }, "A esa hora empieza el día nuevo para el repaso. Los cambios se guardan solos."),
+          h("div", { class: "campos-dos" },
+            h("label", {}, "Tarjetas nuevas por día", nuevas),
+            h("label", {}, "Hora de cambio de día", hora)),
+          errorAjustes && h("p", { class: "aviso", role: "alert" }, errorAjustes)),
+        dibujarTema(),
+        d.sync && dibujarCuenta(d.sync),
+        dibujarRespaldo(),
+        dibujarMigracion(),
+        (d.sync) && h("p", { class: "etiqueta grupo-opcional" }, "Opcionales"),
+        d.sync && dibujarExterno(d.sync),
+        d.sync && dibujarAudioAjustes(d.sync)));
   }
 
   const NOMBRE_TEMA: Record<Tema, string> = { sistema: "Sistema", claro: "Claro", oscuro: "Oscuro" };
@@ -1361,9 +1402,12 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
         });
         return h("label", {}, radio, h("span", { class: "opcion" }, NOMBRE_TEMA[t]));
       }));
-    return h("div", {}, h("h2", {}, "Tema"), opciones,
+    return h("section", { class: "panel ajuste" }, h("h2", {}, "Apariencia"), opciones,
       h("p", { class: "suave", id: "ayuda-tema" }, "“Sistema” sigue el modo claro u oscuro de tu dispositivo. Se guarda solo en este dispositivo."));
   }
+
+  /** Insignia de estado de una función opcional: activo (verde), desactivado (neutro) o falta configurar (aviso). */
+  const claseEstadoOpcional = (e: { activo: boolean; configurado: boolean }) => (!e.activo ? "estado-nuevo" : !e.configurado ? "estado-aviso" : "estado-aldia");
 
   function textoAudioAjustes(e: EstadoAudio): string {
     if (!e.activo) return "Estado: desactivado.";
@@ -1373,13 +1417,14 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
 
   function dibujarAudioAjustes(s: ControlSync): Node {
     const titulo = h("h2", {}, "Entrada por audio (opcional)");
+    const caja = (...hijos: Hijo[]) => h("section", { class: "panel ajuste audio-ajustes" }, ...hijos);
     const aviso1 = h("p", { class: "suave" },
       "Si lo activás, al grabar una idea el audio se manda a Groq para transcribirlo. No se guarda en ningún lado: el servidor lo descarta apenas responde. Si está desactivado, no sale ningún audio. Es opcional: la app funciona completa sin esto.");
     if (!s.hayCuenta() || !s.pedirConSesion) {
-      return h("div", { class: "audio-ajustes" }, titulo, aviso1, h("p", { class: "suave", id: "audio-ajustes-estado" }, "Iniciá sesión para configurarlo."));
+      return caja(titulo, aviso1, h("p", { class: "suave", id: "audio-ajustes-estado" }, "Iniciá sesión para configurarlo."));
     }
     if (!audioEstado) {
-      return h("div", { class: "audio-ajustes" }, titulo, aviso1,
+      return caja(titulo, aviso1,
         h("p", { class: "aviso", role: "alert", id: "audio-ajustes-estado" }, errorAudioAjustes || "No se pudo consultar el estado."));
     }
     const pedir = s.pedirConSesion.bind(s);
@@ -1389,9 +1434,10 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       const r = await pedir("/ajustes/audio", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ activo: interruptor.checked }) });
       if (!r.ok) throw new Error("No se pudo guardar el cambio.");
     }));
-    return h("div", { class: "audio-ajustes" }, titulo, aviso1,
-      h("label", {}, interruptor, " Permitir dictar apuntes con el micrófono"),
-      h("p", { id: "audio-ajustes-estado", role: "status" }, textoAudioAjustes(audioEstado)),
+    interruptor.className = "interruptor";
+    return caja(titulo, aviso1,
+      h("label", { class: "tilde interruptor-fila" }, interruptor, h("span", {}, "Permitir dictar apuntes con el micrófono")),
+      h("p", { id: "audio-ajustes-estado", class: `insignia-estado ${claseEstadoOpcional(audioEstado)}`, role: "status" }, textoAudioAjustes(audioEstado)),
       errorAudioAjustes && h("p", { class: "aviso", role: "alert" }, errorAudioAjustes));
   }
 
@@ -1417,10 +1463,11 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   }
 
   function dibujarExterno(s: ControlSync): Node {
+    const caja = (...hijos: Hijo[]) => h("section", { class: "panel ajuste respaldo-externo" }, ...hijos);
     const aviso1 = h("p", { class: "suave" },
       "Si lo activás, el servidor sube cada noche una copia CIFRADA de todos tus datos a tu bucket privado de Backblaze B2 (se conservan las últimas 30). Si está desactivado, no sale nada del servidor. Es opcional: la app funciona completa sin esto.");
     if (!s.hayCuenta() || !s.pedirConSesion) {
-      return h("div", { class: "respaldo-externo" }, h("h2", {}, "Respaldo externo (opcional)"), aviso1,
+      return caja(h("h2", {}, "Respaldo externo (opcional)"), aviso1,
         h("p", { class: "suave", id: "externo-estado" }, "Iniciá sesión para configurarlo."));
     }
     const pedir = s.pedirConSesion.bind(s);
@@ -1435,18 +1482,19 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       aviso = x.mensaje;
     });
     if (!externo) {
-      return h("div", { class: "respaldo-externo" }, h("h2", {}, "Respaldo externo (opcional)"), aviso1,
+      return caja(h("h2", {}, "Respaldo externo (opcional)"), aviso1,
         h("p", { class: "aviso", role: "alert", id: "externo-estado" }, errorExterno || "No se pudo consultar el estado."));
     }
     const u = externo.ultimo_resultado;
     const interruptor = h("input", { type: "checkbox", id: "externo-activo", checked: externo.activo }) as HTMLInputElement;
     interruptor.checked = externo.activo;
     interruptor.addEventListener("change", () => cambiar(interruptor.checked));
-    return h("div", { class: "respaldo-externo" },
+    interruptor.className = "interruptor";
+    return caja(
       h("h2", {}, "Respaldo externo (opcional)"),
       aviso1,
-      h("label", {}, interruptor, " Subir una copia cifrada cada noche"),
-      h("p", { id: "externo-estado", role: "status" }, textoExterno(externo)),
+      h("label", { class: "tilde interruptor-fila" }, interruptor, h("span", {}, "Subir una copia cifrada cada noche")),
+      h("p", { id: "externo-estado", class: `insignia-estado ${claseEstadoOpcional(externo)}`, role: "status" }, textoExterno(externo)),
       u && h("p", { id: "externo-ultimo", class: u.ok ? "suave" : "aviso" }, `Último resultado (${formatearInstante(u.cuando)}): ${u.mensaje}`),
       h("div", { class: "acciones" },
         boton("Respaldar ahora", ahora, "principal chico", externo.activo ? {} : { disabled: true })));
@@ -1456,8 +1504,11 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     cuentaDibujada = s.hayCuenta();
     const detalle = h("p", { id: "detalle-sync", class: "suave", role: "status" });
     if (cuentaDibujada) {
-      return h("div", { class: "cuenta" },
-        h("h2", {}, "Cuenta"),
+      return h("section", { class: "panel ajuste cuenta" },
+        h("h2", {}, "Sincronización y cuenta"),
+        h("p", { class: "suave" }, "Tus datos se guardan en este dispositivo y se sincronizan con tu servidor."),
+        h("p", { class: "etiqueta" }, "Cuenta"),
+        h("p", { class: "estado-linea" }, h("span", { class: "insignia-estado insignia-sync estado-nuevo" }, "")),
         h("p", {}, "Sesión iniciada: tus datos se sincronizan con el servidor."),
         detalle,
         h("div", { class: "acciones" },
@@ -1478,8 +1529,11 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       const ke = ev as KeyboardEvent;
       if (ke.key === "Enter" && !ke.isComposing) { ke.preventDefault(); entrar(); }
     });
-    return h("div", { class: "cuenta" },
-      h("h2", {}, "Cuenta"),
+    return h("section", { class: "panel ajuste cuenta" },
+      h("h2", {}, "Sincronización y cuenta"),
+      h("p", { class: "suave" }, "Iniciá sesión para sincronizar tus datos con tu servidor. Sin sesión, todo sigue guardado en este dispositivo."),
+      h("p", { class: "etiqueta" }, "Cuenta"),
+      h("p", { class: "estado-linea" }, h("span", { class: "insignia-estado insignia-sync estado-nuevo" }, "")),
       detalle,
       h("label", {}, "Contraseña", clave),
       errorCuenta && h("p", { class: "aviso", role: "alert" }, errorCuenta),
@@ -1499,8 +1553,8 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
         });
       },
     }) as HTMLInputElement;
-    return h("div", { class: "respaldo" },
-      h("h2", {}, "Respaldo"),
+    return h("section", { class: "panel ajuste respaldo" },
+      h("h2", {}, "Datos y respaldos"),
       h("p", { class: "suave" }, "Exportar descarga un archivo con todo (incluida la papelera y todos los repasos). Importar suma ese archivo a lo que ya tenés, sin borrar nada ni pisar lo más reciente."),
       h("div", { class: "acciones" },
         boton("Exportar todo", () => accion(async () => {
@@ -1541,7 +1595,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       },
     }) as HTMLInputElement;
     const l = informeMigracion ? lineasDeMigracion(informeMigracion) : null;
-    return h("div", { class: "respaldo migracion", id: "migracion" },
+    return h("section", { class: "panel ajuste respaldo migracion", id: "migracion" },
       h("h2", {}, "Importar respaldo del Lean OS original"),
       h("p", { class: "suave" }, "Elegí el ZIP que descargaste con “Exportar todo” en el Lean OS original, o sus archivos JSON. Se suman a lo que ya tenés sin duplicar nada ni pisar tus repasos."),
       h("label", {}, "Archivos del respaldo original", archivo),

@@ -496,8 +496,8 @@ describe("P15 (CSS) y P17 (DOM): navegación, tamaños táctiles e íconos", () 
 
   it("P17 (DOM): los íconos son SVG propios inline con aria-hidden y focusable=false, siempre junto a texto o con etiqueta; sin emojis", async () => {
     const { doc } = await abrirApp();
-    const svgs = [...doc.querySelectorAll("svg")];
-    expect(svgs.length).toBe(6); // 5 pestañas + Ajustes
+    expect(doc.querySelectorAll("header svg").length).toBe(6); // 5 pestañas + Ajustes
+    const svgs = [...doc.querySelectorAll("svg")]; // la cabecera más los íconos de la pantalla (todos decorativos)
     for (const s of svgs) {
       expect(s.getAttribute("aria-hidden")).toBe("true");
       expect(s.getAttribute("focusable")).toBe("false");
@@ -517,5 +517,194 @@ describe("P15 (CSS) y P17 (DOM): navegación, tamaños táctiles e íconos", () 
       await app.esperar();
       expect(doc.querySelectorAll("[style]").length, p).toBe(0);
     }
+  });
+});
+
+// =====================================================================
+// Rediseño de Hoy, Tareas, Apuntes, Tarjetas y Ajustes (p-rediseno): solo se amplía lo anterior.
+describe("P13: contraste AA de los componentes del rediseño (claro y oscuro)", () => {
+  const PARES: [string, string, number, string][] = [
+    ["--texto", "--aviso-fondo", 4.5, "título de tarea atrasada"],
+    ["--exito", "--exito-fondo", 4.5, "insignia activo / tipo aprendizaje"],
+    ["--violeta-tinta", "--violeta-fondo", 4.5, "insignia tipo idea y cuadrito de área"],
+    ["--turquesa-tinta", "--turquesa-fondo", 4.5, "cuadrito de área turquesa"],
+    ["--rosa-tinta", "--rosa-fondo", 4.5, "cuadrito de área rosa"],
+    ["--suave", "--peligro-fondo", 4.5, "texto suave sobre el fondo de peligro"],
+    ["--texto", "--peligro-fondo", 4.5, "texto sobre peligro suave"],
+    ["--acento-tinta", "--superficie-2", 4.5, "acento tinta sobre superficie 2"],
+    ["--aviso-texto", "--superficie", 4.5, "aviso sobre superficie"],
+    ["--borde-control", "--superficie-2", 3, "borde de controles sobre superficie 2"],
+    ["--acento-texto", "--acento", 4.5, "marca del tilde y chip de día elegido"],
+    ["--superficie", "--borde-control", 3, "perilla del interruptor apagado sobre su pista"],
+    ["--acento-texto", "--acento", 3, "perilla del interruptor encendido sobre su pista"],
+  ];
+  for (const tema of ["claro", "oscuro"] as const) {
+    it(`P13: los pares de los componentes nuevos cumplen AA en el tema ${tema}`, () => {
+      const t = tokens(tema);
+      const fallas: string[] = [];
+      for (const [a, b, minimo, que] of PARES) {
+        const r = contraste(t.get(a)!, t.get(b)!);
+        if (r < minimo) fallas.push(`${que}: ${a} sobre ${b} = ${r.toFixed(2)} (mínimo ${minimo})`);
+      }
+      expect(fallas).toEqual([]);
+    });
+  }
+});
+
+describe("P12: componentes del rediseño con tokens", () => {
+  it("P12: tarjetas, paneles, estados vacíos y campos usan el radio y las sombras de los tokens; los campos de búsqueda son pastilla", () => {
+    const t = tokens("claro");
+    for (const sel of [".panel", ".vacio-estado", ".lista", ".panel-estadisticas", "div.edicion", ".atrasadas"]) {
+      expect(resolver(t, regla(sel)[0]!.decl.get("border-radius")!), sel).toBe("20px");
+    }
+    expect(resolver(t, regla(".campo-pastilla")[0]!.decl.get("border-radius")!)).toBe("999px");
+    expect(regla(".panel")[0]!.decl.get("box-shadow")).toBe("var(--sombra)");
+    expect(resolver(t, regla(".dato")[0]!.decl.get("border-radius")!)).toBe("999px");
+    expect(regla(".estadisticas dd")[0]!.decl.get("font-weight")).toBe("800");
+  });
+
+  it("P12: ningún color suelto (#hex o rgb) en las reglas nuevas del rediseño: todo sale de los tokens", () => {
+    const desde = CSS.indexOf("Rediseño: Hoy, Tareas");
+    expect(desde).toBeGreaterThan(0);
+    expect(CSS.slice(desde)).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
+  });
+
+  it("P12: los textos largos se cortan en los componentes nuevos (overflow-wrap: anywhere)", () => {
+    for (const sel of [".dato", ".apunte-titulo", ".markdown", ".estadisticas dd"]) {
+      expect(regla(sel).some((r) => r.decl.get("overflow-wrap") === "anywhere"), sel).toBe(true);
+    }
+  });
+});
+
+describe("P15 (CSS): controles de 44 px y elementos fijos del rediseño", () => {
+  const PX = (t: Tokens, v: string | undefined): number => {
+    const m = /^([\d.]+)(px|rem)$/.exec(resolver(t, v ?? "").trim());
+    return m ? Number(m[1]) * (m[2] === "rem" ? 16 : 1) : 0;
+  };
+  it("P15: tilde, interruptor, chips de día y enlaces de Markdown miden 44 px o más", () => {
+    const t = tokens("claro");
+    for (const sel of ['input[type="checkbox"].casilla', 'input[type="checkbox"].interruptor']) {
+      const r = regla(sel)[0]!;
+      expect(PX(t, r.decl.get("min-height")), `${sel} alto`).toBeGreaterThanOrEqual(44);
+      expect(PX(t, r.decl.get("width")), `${sel} ancho`).toBeGreaterThanOrEqual(44);
+    }
+    for (const sel of [".chip-dia", ".chip-dia .opcion", ".markdown a"]) {
+      const mayor = (prop: string) => Math.max(...regla(sel).map((r) => PX(t, r.decl.get(prop))));
+      expect(mayor("min-height"), `${sel} alto`).toBeGreaterThanOrEqual(44);
+      expect(mayor("min-width"), `${sel} ancho`).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  it("P15: en el celular la acción de Hoy es fija, queda sobre la barra inferior sin superponerse y el contenido deja lugar", () => {
+    const fijo = regla(".acceso-fijo", "(max-width: 640px)")[0]!;
+    expect(fijo.decl.get("position")).toBe("fixed");
+    expect(fijo.decl.get("bottom")).toContain("var(--alto-nav-movil)");
+    expect(fijo.decl.get("bottom")).toContain("env(safe-area-inset-bottom)");
+    expect(Number(fijo.decl.get("z-index"))).toBeLessThan(Number(regla(".nav", "(max-width: 640px)")[0]!.decl.get("z-index")));
+    expect(regla(".pantalla-hoy.con-acceso", "(max-width: 640px)")[0]!.decl.get("padding-bottom")).toContain("3.25rem");
+    expect(regla(".acceso-fijo")[0]!.decl.get("position")).toBeUndefined(); // en escritorio va en la cabecera, sin fijar
+    expect(regla(".lista li .acciones", "(max-width: 640px)")[0]!.decl.get("display")).toBe("grid");
+    expect(regla(".ajustes-grilla", "(max-width: 640px)")[0]!.decl.get("grid-template-columns")).toBe("minmax(0, 1fr)");
+  });
+});
+
+describe("P15 (CSS): los botones de acción no parten palabras a 390 px", () => {
+  it("P15: los botones de .acciones y .barra no se parten (nowrap) y las columnas de acciones en celular son de 7rem o más", () => {
+    for (const sel of [".acciones .boton", ".barra .boton"]) {
+      expect(regla(sel).some((r) => r.decl.get("white-space") === "nowrap"), sel).toBe(true);
+    }
+    for (const sel of [".lista li .acciones", ".lista.tarjetas li .acciones"]) {
+      const g = regla(sel, "(max-width: 640px)")[0]!.decl.get("grid-template-columns")!;
+      const m = /minmax\(([\d.]+)rem/.exec(g);
+      expect(Number(m![1]), sel).toBeGreaterThanOrEqual(7);
+    }
+    expect(regla(".lista li.edicion").some((r) => /var\(--e3\)$/.test(r.decl.get("margin") ?? "")), "separación bajo el formulario de edición").toBe(true);
+  });
+});
+
+describe("P16: movimiento de los componentes del rediseño", () => {
+  it("P16: las transiciones nuevas son de color o transform y no hay animaciones con @keyframes", () => {
+    const t = tokens("claro");
+    const nuevas = REGLAS.filter((r) => ['input[type="checkbox"].casilla', ".casilla::before", ".interruptor::before", ".interruptor::after", ".chip-dia .opcion"].includes(r.selector));
+    expect(nuevas.length).toBeGreaterThanOrEqual(4);
+    for (const r of nuevas) {
+      const v = r.decl.get("transition");
+      if (!v) continue;
+      for (const p of resolver(t, v).split(",").map((x) => x.trim().split(/\s+/)[0]!)) expect(["background-color", "color", "border-color", "transform"]).toContain(p);
+    }
+    expect(CSS).not.toMatch(/@keyframes/);
+  });
+});
+
+describe("P17: pantallas rediseñadas (DOM)", () => {
+  async function conDatos() {
+    const ui = await abrirApp();
+    const rapida = ui.doc.querySelector("#tarea-rapida") as unknown as HTMLInputElement;
+    rapida.value = "Comprar pan";
+    rapida.dispatchEvent(new ui.ventana.KeyboardEvent("keydown", { key: "Enter", bubbles: true }) as unknown as Event);
+    await ui.app.esperar();
+    return ui;
+  }
+
+  it("P17: cada pantalla tiene un solo <h1> y un solo <nav>, sin style en línea y con todos los íconos aria-hidden", async () => {
+    const { doc, app } = await conDatos();
+    for (const p of ["areas", "hoy", "repaso", "tareas", "apuntes", "tarjetas", "ajustes"] as const) {
+      app.ir(p);
+      await app.esperar();
+      expect(doc.querySelectorAll("h1").length, p).toBe(1);
+      expect(doc.querySelectorAll("nav").length, p).toBe(1);
+      expect(doc.querySelectorAll("[style]").length, p).toBe(0);
+      for (const s of doc.querySelectorAll("svg")) {
+        if (s.classList.contains("grafico-svg")) continue;
+        expect(s.getAttribute("aria-hidden"), `${p} svg`).toBe("true");
+      }
+      expect(doc.body.textContent, p).not.toMatch(/\p{Extended_Pictographic}/u);
+    }
+  });
+
+  it("P17: Hoy tiene encabezado con fecha, métricas, el tilde accesible y la tarea rápida con su botón", async () => {
+    const { doc } = await conDatos();
+    expect(doc.querySelector(".encabezado-pantalla .fecha-pantalla")!.textContent).toMatch(/\d{2}\/\d{2}\/\d{4}/);
+    expect(doc.querySelector("input.casilla")!.getAttribute("aria-label")).toBe("Marcar como hecha: Comprar pan");
+    expect(doc.querySelectorAll(".estadisticas > div").length).toBe(3);
+    expect(doc.querySelector("#tarea-rapida")!.classList.contains("campo-pastilla")).toBe(true);
+    expect(doc.querySelector("#tarea-rapida-agregar")!.textContent).toContain("Agregar");
+  });
+
+  it("P17: el panel de estadísticas muestra sus gráficos y no usa style en línea", async () => {
+    const { doc, app } = await conDatos();
+    (doc.querySelector("#ver-estadisticas") as unknown as HTMLElement).click();
+    await app.esperar();
+    expect(doc.querySelectorAll("#panel-estadisticas .grafico").length).toBe(4);
+    expect(doc.querySelectorAll("[style]").length).toBe(0);
+  });
+
+  it("P17: los estados vacíos tienen ícono decorativo y mensaje; Ajustes agrupa sus secciones en tarjetas con un h2 cada una", async () => {
+    const { doc, app } = await conDatos();
+    app.ir("apuntes");
+    await app.esperar();
+    const vacio = doc.querySelector(".vacio-estado")!;
+    expect(vacio.querySelector(".vacio-icono svg")!.getAttribute("aria-hidden")).toBe("true");
+    expect(vacio.querySelector("p")!.textContent).toContain("Todavía no hay apuntes");
+    app.ir("ajustes");
+    await app.esperar();
+    const titulos = [...doc.querySelectorAll(".panel.ajuste > h2")].map((x) => x.textContent);
+    expect(titulos).toEqual(expect.arrayContaining(["Estudio", "Apariencia", "Datos y respaldos", "Importar respaldo del Lean OS original"]));
+    for (const c of doc.querySelectorAll(".panel.ajuste")) expect(c.querySelectorAll(":scope > h2").length).toBe(1);
+  });
+});
+
+describe("P17: el Repaso en el celular", () => {
+  it("P17: el Repaso muestra solo chips, progreso, tarjeta y botones; los atajos de teclado se ocultan a 640 px o menos", async () => {
+    const { crearTarjeta } = await import("../src/compartido/gestion.ts");
+    const { doc, app, almacen } = await abrirApp();
+    await crearTarjeta(almacen, new RelojSimulado("2026-11-22T15:00:00.000Z"), { pregunta: "¿Capital de Francia?", respuesta: "París", pista: "", area_id: null, area_texto: "Geografía" });
+    app.ir("repaso");
+    await app.esperar();
+    const hijos = [...doc.querySelector(".repaso")!.children].map((x) => x.className.split(" ")[0]);
+    expect(hijos.every((c) => ["repaso-selector", "repaso-progreso", "tarjeta-repaso", "atajos"].includes(c!)), hijos.join(",")).toBe(true);
+    expect(hijos).toContain("tarjeta-repaso");
+    expect(regla(".atajos", "(max-width: 640px)")[0]!.decl.get("display")).toBe("none");
+    expect(doc.querySelectorAll("[style]").length).toBe(0);
   });
 });
