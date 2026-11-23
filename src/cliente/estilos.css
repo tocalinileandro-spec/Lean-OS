@@ -248,6 +248,11 @@ label { display: block; margin: var(--e3) 0; font-weight: 600; } label > * { mar
 .chips-fila { position: relative; align-items: center; }
 .chips-fila .chip { flex: none; max-width: 100%; text-align: left; overflow-wrap: anywhere; }
 .chip-n { font-weight: 700; opacity: 0.85; }
+/* Repaso libre: interruptor "Repasar todo" y franja de aviso */
+.repaso-modo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); margin-bottom: var(--e2); }
+.repaso-modo-ayuda { font-size: var(--t-sm); overflow-wrap: anywhere; min-width: 0; }
+.franja-libre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin-bottom: var(--e3); font-weight: 600; }
+.franja-libre-texto { min-width: 0; overflow-wrap: anywhere; }
 .chip.chico { font-size: var(--t-xs); padding: 0 var(--e3); }
 .chips-etiqueta { flex: none; margin-right: var(--e1); font-size: var(--t-sm); font-weight: 600; color: var(--suave); }
 .repaso-progreso { display: flex; flex-direction: column; gap: var(--e2); }

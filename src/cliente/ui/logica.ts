@@ -11,9 +11,9 @@ import {
 import { calcularEstadisticas, type Estadisticas } from "../../compartido/estadisticas.ts";
 import { normalizar } from "../../compartido/normalizar.ts";
 import { tareasDeHoy } from "../../compartido/tareas.ts";
-import { calificar, construirCola, SesionRepaso } from "../../compartido/repaso.ts";
+import { calificar, construirCola, SesionLibre, SesionRepaso } from "../../compartido/repaso.ts";
 import type { InformeMigracion } from "../../compartido/migracion-original.ts";
-import { colaDeRepaso, contextoDeTarjeta, proximaFechaDeRepaso, type ContextoTarjeta } from "../../compartido/areas.ts";
+import { colaDeRepaso, colaLibre, contextoDeTarjeta, proximaFechaDeRepaso, type ContextoTarjeta } from "../../compartido/areas.ts";
 import type { Reloj } from "../../compartido/reloj.ts";
 import type { ControlSync } from "../sync/motor.ts";
 
@@ -216,6 +216,10 @@ export interface VistaRepaso {
   puedeDeshacer: boolean;
   /** Filtro de la sesión: id del área o subárea (null = todo lo de hoy). */
   areaId: Id | null;
+  /** Solo presente (true) en el repaso libre: práctica que no guarda nada. */
+  libre?: true;
+  /** Solo en el repaso libre: cuántas tarjetas tenía la sesión al arrancar (para "Listo: repasaste N tarjetas"). */
+  totalInicial?: number;
   /** Con tarjeta: "Tarjeta {numero} de {total}". numero = calificadas + 1; total = calificadas + pendientes (crece con cada "Otra vez"). */
   numero?: number;
   total?: number;
@@ -243,8 +247,20 @@ export class PantallaRepaso {
   #idRespuesta: Id | undefined;
   #idPista: Id | undefined;
   #calificadas = 0;
+  #totalInicial = 0;
 
-  private constructor(private d: Dependencias, private sesion: SesionRepaso, private filtro: Id | null) {}
+  private constructor(private d: Dependencias, private sesion: SesionRepaso | SesionLibre, private filtro: Id | null, private modoLibre = false) {}
+
+  /** true en el repaso libre (no escribe nada en el almacén). */
+  get libre(): boolean { return this.modoLibre; }
+
+  /** Repaso libre: todas las tarjetas activas del filtro, sin tope de nuevas. Califica solo en memoria. */
+  static async iniciarLibre(d: Dependencias, filtro: { areaId?: Id | null } = {}): Promise<PantallaRepaso> {
+    const cola = await colaLibre(d.almacen, filtro.areaId ?? null);
+    const p = new PantallaRepaso(d, new SesionLibre(d.almacen, cola), filtro.areaId ?? null, true);
+    p.#totalInicial = cola.length;
+    return p;
+  }
 
   /** Filtro con el que arrancó la sesión (se mantiene mientras se califica). */
   get areaId(): Id | null { return this.filtro; }
@@ -266,7 +282,8 @@ export class PantallaRepaso {
 
   async vista(): Promise<VistaRepaso> {
     const id = await this.sesion.siguiente();
-    const base = { pendientes: this.sesion.pendientes, calificadas: this.#calificadas, puedeDeshacer: this.#calificadas > 0, areaId: this.filtro };
+    const base = { pendientes: this.sesion.pendientes, calificadas: this.#calificadas, puedeDeshacer: this.#calificadas > 0, areaId: this.filtro, ...(this.modoLibre ? { libre: true as const, totalInicial: this.#totalInicial } : {}) };
+    if (id === undefined && this.modoLibre) return { hayTarjeta: false, ...base, proxima: null };
     if (id === undefined) {
       const aj = cargarAjustes(this.d.persistencia);
       return { hayTarjeta: false, ...base, proxima: await proximaFechaDeRepaso(this.d.almacen, this.d.reloj, { limiteNuevas: aj.nuevasPorDia, areaId: this.filtro }) };
@@ -292,7 +309,7 @@ export class PantallaRepaso {
       const hoy = diaLogico(this.d.reloj);
       v.botones = CALIFICACIONES.map((b, i) => ({
         boton: b, etiqueta: ETIQUETAS[b], atajo: i + 1,
-        intervalo: textoIntervalo(calificar(t, b, hoy).intervalo),
+        intervalo: this.modoLibre ? "" : textoIntervalo(calificar(t, b, hoy).intervalo),
       }));
     }
     return v;

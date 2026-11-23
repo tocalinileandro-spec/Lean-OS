@@ -17,7 +17,7 @@ import {
   detenerRepeticion, editarTarea, marcarHecha,
 } from "../../compartido/tareas.ts";
 import {
-  borrarArea, borrarSubarea, borrarTema, contadoresDeRepaso, crearArea, detalleArea, moverTema, resumenAreas, resumenDeBorrado, restaurarArea, restaurarTema,
+  borrarArea, borrarSubarea, borrarTema, colaLibre, contadoresDeRepaso, contadoresDeRepasoLibre, crearArea, detalleArea, moverTema, resumenAreas, resumenDeBorrado, restaurarArea, restaurarTema,
   type ContadoresDeRepaso, type GrupoDeTemas, type TemaDeArea,
 } from "../../compartido/areas.ts";
 import { diaLogico } from "../../compartido/dia.ts";
@@ -572,6 +572,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
             h("p", { class: "suave subtitulo" }, `${plural(det.tarjetas, "tarjeta", "tarjetas")} · ${plural(det.subareas.length, "subárea", "subáreas")} · ${det.paraHoy} para repasar hoy`))),
         h("div", { class: "acciones" },
           det.paraHoy > 0 && boton(`Repasar esta área · ${det.paraHoy}`, () => repasarArea(det.id), "principal", { id: "a-repasar-area" }),
+          det.tarjetas > 0 && boton("Repasar todo el área", () => repasarTodo(det.id, true), "suave", { id: "a-repasar-todo" }),
           boton("Importar tarjetas", abrirImportar, "suave", { id: "a-importar" }))),
       avisoDeshacer(),
       h("div", { class: "secciones-area" }, ...secciones),
@@ -669,6 +670,22 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   // ---------- Repaso ----------
   /** Arranca una sesión nueva con ese filtro (null = todo lo de hoy). */
   function elegirFiltroRepaso(areaId: Id | null): void {
+    const libre = repaso?.libre === true;
+    accion(async () => { resumenRepaso = null; repaso = libre ? await PantallaRepaso.iniciarLibre(d, { areaId }) : await PantallaRepaso.iniciar(d, { areaId }); });
+  }
+
+  /** Repaso libre (práctica): todas las tarjetas activas del filtro; no cambia ninguna fecha. */
+  function repasarTodo(areaId: Id | null, irAPantalla = false): void {
+    accion(async () => {
+      if (irAPantalla) { pantalla = "repaso"; limpiarAreas(); }
+      resumenRepaso = null;
+      repaso = await PantallaRepaso.iniciarLibre(d, { areaId });
+      focoEn = null;
+    });
+  }
+
+  /** Vuelve a la cola normal del día con el mismo filtro. */
+  function salirDelModoLibre(areaId: Id | null): void {
     accion(async () => { resumenRepaso = null; repaso = await PantallaRepaso.iniciar(d, { areaId }); });
   }
 
@@ -679,11 +696,17 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   }
 
   /** "Qué repasar": Todo lo de hoy + una por área; con un área elegida, segunda fila con "Toda el área" y sus subáreas. */
-  function selectorRepaso(c: ContadoresDeRepaso, filtro: Id | null): Node {
+  function selectorRepaso(c: ContadoresDeRepaso, filtro: Id | null, libre = false): Node {
     const raizElegida = filtro ? c.areas.find((a) => a.id === filtro || a.subareas.some((s) => s.id === filtro)) : undefined;
     const filas: Node[] = [
+      h("div", { class: "repaso-modo" },
+        h("button", {
+          type: "button", class: "chip modo-libre", id: "r-modo-libre", "aria-pressed": libre ? "true" : "false",
+          onclick: () => (libre ? salirDelModoLibre(filtro) : repasarTodo(filtro)),
+        }, "Repasar todo"),
+        h("span", { class: "suave repaso-modo-ayuda" }, libre ? "Práctica sin cambiar fechas." : "Practicá todo, aunque no toque hoy.")),
       h("div", { class: "chips chips-fila", role: "group", "aria-label": "Qué repasar" },
-        chip("r-chip-todo", "Todo lo de hoy", c.todo, !raizElegida, () => elegirFiltroRepaso(null)),
+        chip("r-chip-todo", libre ? "Todo" : "Todo lo de hoy", c.todo, !raizElegida, () => elegirFiltroRepaso(null)),
         ...c.areas.map((a) => chip(`r-chip-${a.id}`, a.nombre, a.paraHoy, raizElegida?.id === a.id, () => elegirFiltroRepaso(a.id)))),
     ];
     if (raizElegida && raizElegida.subareas.length > 0) {
@@ -710,9 +733,28 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     if (!repaso) repaso = await PantallaRepaso.iniciar(d);
     const v: VistaRepaso = await repaso.vista();
     const aj = cargarAjustes(d.persistencia);
-    const selector = selectorRepaso(await contadoresDeRepaso(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia }), v.areaId);
+    const libre = v.libre === true;
+    const selector = selectorRepaso(
+      libre ? await contadoresDeRepasoLibre(d.almacen) : await contadoresDeRepaso(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia }),
+      v.areaId, libre);
     const deshacer = v.puedeDeshacer && boton("Deshacer (Ctrl+Z)", () => accion(() => repaso!.deshacer()), "suave chico");
+    const franjaLibre = libre && h("div", { class: "aviso franja-libre", id: "r-franja-libre", role: "note" },
+      h("span", { class: "franja-libre-texto" }, "Modo libre: no cambia tus fechas de repaso"),
+      boton("Salir del modo libre", () => salirDelModoLibre(v.areaId), "suave chico", { id: "r-salir-libre" }));
+    if (!v.hayTarjeta && libre) {
+      const n = v.totalInicial ?? 0;
+      const terminada = v.calificadas > 0;
+      return h("section", { class: "repaso repaso-libre" }, selector, franjaLibre,
+        h("div", { class: "tarjeta-repaso repaso-vacio", id: "r-libre-fin" },
+          h("h1", { class: "pregunta" }, terminada ? `Listo: repasaste ${n} ${n === 1 ? "tarjeta" : "tarjetas"} en modo libre` : "No hay tarjetas para repasar acá"),
+          h("p", { class: "suave" }, terminada ? "No cambió ninguna fecha de repaso." : "Importá tarjetas o elegí otra área para practicar."),
+          h("div", { class: "acciones acciones-centro" },
+            boton("Volver al repaso del día", () => salirDelModoLibre(v.areaId), "principal", { id: "r-volver-dia", "data-foco": "1" }),
+            terminada && boton("Repasar todo de nuevo", () => repasarTodo(v.areaId), "suave", { id: "r-repetir-libre" }),
+            deshacer)));
+    }
     if (!v.hayTarjeta) {
+      const hayActivas = (await colaLibre(d.almacen, v.areaId)).length > 0;
       const donde = v.areaId ? (v.areaId && (await d.almacen.areas.obtener(v.areaId))?.padre_id ? "en esta subárea" : "en esta área") : "hoy";
       return h("section", { class: "repaso" }, selector,
         h("div", { class: "tarjeta-repaso repaso-vacio" },
@@ -720,7 +762,8 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
           h("p", { class: "suave" }, v.calificadas > 0 ? `Listo: repasaste ${v.calificadas} ${v.calificadas === 1 ? "tarjeta" : "tarjetas"}.` : "No hay tarjetas para repasar ahora."),
           v.proxima && h("p", { class: "repaso-proxima" }, `Lo próximo toca el ${formatearFecha(v.proxima)}.`),
           h("div", { class: "acciones acciones-centro" },
-            boton("Ver áreas", () => ir("areas"), "principal", { "data-foco": "1" }),
+            hayActivas && boton("Repasar todo", () => repasarTodo(v.areaId), "principal", { id: "r-repasar-todo", "data-foco": "1" }),
+            boton("Ver áreas", () => ir("areas"), hayActivas ? "suave" : "principal", hayActivas ? {} : { "data-foco": "1" }),
             boton("Volver a Hoy", () => ir("hoy"), "suave"),
             deshacer)));
     }
@@ -736,11 +779,11 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
               ...v.botones!.map((b) =>
                 h("button", { type: "button", class: `boton calificar calificar-${b.boton}`, onclick: () => calificar(b.boton) },
                   h("span", { class: "etiqueta-boton" }, b.etiqueta),
-                  h("span", { class: "intervalo" }, b.intervalo),
+                  !libre && h("span", { class: "intervalo" }, b.intervalo),
                   h("kbd", {}, String(b.atajo))))))]
       : [boton("Ver respuesta", () => accion(() => repaso!.verRespuesta()), "grande principal", { "data-foco": "1" })];
     const textoTarjeta = `Tarjeta ${v.numero} de ${v.total}`;
-    return h("section", { class: "repaso" }, selector,
+    return h("section", { class: libre ? "repaso repaso-libre" : "repaso" }, selector, franjaLibre,
       h("div", { class: "repaso-progreso" },
         h("div", { class: "repaso-progreso-texto" },
           h("span", { class: "repaso-numero" }, textoTarjeta),

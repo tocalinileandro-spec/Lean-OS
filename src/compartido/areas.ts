@@ -167,6 +167,35 @@ export async function contadoresDeRepaso(almacen: Almacen, reloj: Reloj, opcione
   return { todo: cola.length, areas };
 }
 
+// ---------- Repaso libre (P20) ----------
+
+/**
+ * Cola del repaso libre: todas las tarjetas activas (vivas, no suspendidas, con su área viva) del filtro
+ * (todo / área con sus subáreas / subárea), sin tope de nuevas. Orden estable: por vencimiento
+ * (las vencidas, más atrasadas primero, quedan antes que el resto) y, a igual vencimiento, por created_at e id.
+ */
+export async function colaLibre(almacen: Almacen, areaId?: Id | null): Promise<Tarjeta[]> {
+  const areas = await almacen.areas.listar();
+  const vivas = new Set(areas.map((a) => a.id));
+  const ids = areaId ? idsConSubareas(areas, areaId) : null;
+  const cmp = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
+  return (await almacen.tarjetas.listar())
+    .filter((t) => t.deleted_at === null && !t.suspendida && vivas.has(t.area_id) && (!ids || ids.has(t.area_id)))
+    .sort((a, b) => cmp(a.vence, b.vence) || cmp(a.created_at, b.created_at) || cmp(a.id, b.id));
+}
+
+/** Contadores del repaso libre: el mismo formato que `contadoresDeRepaso`, con el total de tarjetas activas en `paraHoy`. */
+export async function contadoresDeRepasoLibre(almacen: Almacen): Promise<ContadoresDeRepaso> {
+  const cola = await colaLibre(almacen);
+  const vivas = (await almacen.areas.listar()).sort(porNombre);
+  const cuenta = (id: Id) => cola.filter((t) => t.area_id === id).length;
+  const areas = vivas.filter((a) => a.padre_id === null).map((a) => {
+    const subareas = vivas.filter((s) => s.padre_id === a.id).map((s) => ({ id: s.id, nombre: s.nombre, paraHoy: cuenta(s.id) }));
+    return { id: a.id, nombre: a.nombre, subareas, paraHoy: cuenta(a.id) + subareas.reduce((n, s) => n + s.paraHoy, 0) };
+  });
+  return { todo: cola.length, areas };
+}
+
 /** Suma días a una fecha AAAA-MM-DD (calendario UTC puro). */
 function masDias(iso: string, dias: number): string {
   const [a, m, d] = iso.split("-").map(Number) as [number, number, number];
