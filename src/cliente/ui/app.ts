@@ -19,8 +19,8 @@ import type { ControlSync } from "../sync/motor.ts";
 import { describirRepeticion, reglaValida, type Repeticion } from "../../compartido/recurrencia.ts";
 import { TIPOS_APUNTE, type Apunte, type Calificacion, type EstadoMeta, type Id, type Tarea, type Tarjeta, type TipoApunte, type Trimestre } from "../../compartido/esquema.ts";
 import {
-  agruparTarjetas, cargarAjustes, formatearFecha, guardarAjustes, mensajeDeError, nombreDeArea, opcionesDeArea,
-  PantallaRepaso, validarAjustes, vistaHoy, type Dependencias, type VistaRepaso,
+  agruparTarjetas, aplicarTema, cargarAjustes, cargarTema, cantidadParaRepasar, formatearFecha, guardarAjustes, guardarTema, mensajeDeError, nombreDeArea,
+  opcionesDeArea, PantallaRepaso, TEMAS, validarAjustes, vistaHoy, type Tema, type Dependencias, type VistaRepaso,
 } from "./logica.ts";
 import {
   ESTADOS_META, etiquetaMeta, itemsPapelera, nombreTipoPapelera, restaurarItem, separarEtiquetas, textoProgreso,
@@ -29,14 +29,16 @@ import {
 import type { Estadisticas } from "../../compartido/estadisticas.ts";
 import { datosGraficos } from "../../compartido/graficos.ts";
 import { graficoRepasosPorDia, graficoRetencion, graficoTarjetasPorArea, graficoTareasPorSemana } from "./graficos-svg.ts";
+import { crearIcono, type NombreIcono } from "./iconos.ts";
 import { renderizarMarkdown } from "./markdown.ts";
 import { detalleEstado, formatearInstante, textoEstado } from "../sync/estado.ts";
 import { exportarLocal, importarRespaldo, lineasDeInforme, type InformeRespaldo } from "../sync/respaldo.ts";
 
 export type Pantalla = "hoy" | "repaso" | "tareas" | "apuntes" | "tarjetas" | "ajustes";
-const PANTALLAS: { id: Pantalla; titulo: string }[] = [
-  { id: "hoy", titulo: "Hoy" }, { id: "repaso", titulo: "Repaso" }, { id: "tareas", titulo: "Tareas" },
-  { id: "apuntes", titulo: "Apuntes" }, { id: "tarjetas", titulo: "Tarjetas" }, { id: "ajustes", titulo: "Ajustes" },
+/** Pestañas de la navegación. "Áreas" lleva por ahora a la pantalla de tarjetas (la pantalla de áreas llega en otra tarea). */
+const PESTANAS: { id: Pantalla; titulo: string; icono: NombreIcono }[] = [
+  { id: "hoy", titulo: "Hoy", icono: "hoy" }, { id: "repaso", titulo: "Repaso", icono: "repaso" }, { id: "tarjetas", titulo: "Áreas", icono: "areas" },
+  { id: "tareas", titulo: "Tareas", icono: "tareas" }, { id: "apuntes", titulo: "Apuntes", icono: "apuntes" },
 ];
 const TIPOS_NOMBRE: Record<TipoApunte, string> = { idea: "Idea", apunte: "Apunte", aprendizaje: "Aprendizaje" };
 /** Campos que conservan el foco al redibujar (se está escribiendo en ellos). */
@@ -149,18 +151,25 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   // ---------- estructura ----------
   const cabecera = h("div", { class: "cabecera" });
   const nav = h("nav", { "aria-label": "Pantallas", class: "nav" });
+  const estadoSlot = h("span", { class: "estado-slot" });
+  const botonAjustes = h("button", { type: "button", id: "ir-ajustes", class: "boton-icono", "aria-label": "Ajustes", title: "Ajustes", onclick: () => ir("ajustes") });
+  botonAjustes.append(crearIcono(doc, "ajustes"));
+  const barra = h("header", { class: "barra-superior" },
+    h("div", { class: "marca" }, h("span", { class: "marca-punto", "aria-hidden": "true" }), h("span", {}, "Lean OS")),
+    nav,
+    h("div", { class: "barra-acciones" }, estadoSlot, botonAjustes));
   const principal = h("main", { id: "principal", tabindex: "-1" });
-  raiz.replaceChildren(cabecera, nav, principal);
+  raiz.replaceChildren(barra, cabecera, principal);
 
   /** Indicador de sincronización (y pedido de confirmación de borrado masivo) siempre visible arriba. */
   function dibujarCabecera(): void {
     const s = d.sync;
     if (!s) return;
     const e = s.estado();
+    estadoSlot.replaceChildren(h("button", {
+      type: "button", id: "estado-sync", class: `estado-sync estado-${e.fase}`, title: "Ver el detalle en Ajustes", onclick: () => ir("ajustes"),
+    }, textoEstado(e)));
     cabecera.replaceChildren(
-      h("button", {
-        type: "button", id: "estado-sync", class: `estado-sync estado-${e.fase}`, title: "Ver el detalle en Ajustes", onclick: () => ir("ajustes"),
-      }, textoEstado(e)),
       ...(e.confirmacion ? [h("div", { class: "aviso confirmar-borrado", role: "alert" },
         h("p", {}, e.confirmacion.mensaje),
         boton("Confirmar y sincronizar", () => { void s.confirmarBorradoMasivo(); }, "peligro chico"))] : []));
@@ -195,8 +204,14 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       versionVista = d.sync.estado().versionDatos;
       dibujarCabecera();
     }
-    nav.replaceChildren(...PANTALLAS.map((p) =>
-      h("button", { type: "button", class: "nav-item", "aria-current": p.id === pantalla ? "page" : undefined, onclick: () => ir(p.id) }, p.titulo)));
+    let pendientesRepaso = 0;
+    try { pendientesRepaso = await cantidadParaRepasar(d); } catch { /* sin insignia si no se pueden contar */ }
+    nav.replaceChildren(...PESTANAS.map((p) =>
+      h("button", { type: "button", class: "nav-item", "aria-current": p.id === pantalla ? "page" : undefined, onclick: () => ir(p.id) },
+        h("span", { class: "nav-icono" }, crearIcono(doc, p.icono)),
+        h("span", { class: "nav-texto" }, p.titulo),
+        p.id === "repaso" && pendientesRepaso > 0 && h("span", { class: "insignia", "aria-label": `${pendientesRepaso} pendientes` }, String(pendientesRepaso)))));
+    if (pantalla === "ajustes") botonAjustes.setAttribute("aria-current", "page"); else botonAjustes.removeAttribute("aria-current");
     const activo = doc.activeElement as HTMLElement | null;
     const idActivo = activo && activo !== doc.body ? activo.id : "";
     const contenido: Hijo[] = [];
@@ -329,7 +344,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
                 h("kbd", {}, String(b.atajo))))))
       : boton("Ver respuesta", () => accion(() => repaso!.verRespuesta()), "grande principal", { "data-foco": "1" });
     return h("section", { class: "tarjeta-repaso" },
-      h("p", { class: "suave" }, `${v.area} · quedan ${v.pendientes}`),
+      h("p", { class: "contexto" }, `${v.area} · quedan ${v.pendientes}`),
       h("h1", { class: "pregunta" }, v.pregunta),
       pista,
       v.respuestaVisible ? null : h("p", { class: "suave" }, "Pensá la respuesta y tocá “Ver respuesta” (o Espacio)."),
@@ -874,11 +889,33 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       h("label", {}, "Tarjetas nuevas por día", nuevas),
       h("label", {}, "Hora de cambio de día", hora),
       h("p", { class: "suave" }, "A esa hora empieza el día nuevo para el repaso. Los cambios se guardan solos."),
+      dibujarTema(),
       errorAjustes && h("p", { class: "aviso", role: "alert" }, errorAjustes),
       d.sync && dibujarCuenta(d.sync),
       dibujarRespaldo(),
       d.sync && dibujarExterno(d.sync),
       d.sync && dibujarAudioAjustes(d.sync));
+  }
+
+  const NOMBRE_TEMA: Record<Tema, string> = { sistema: "Sistema", claro: "Claro", oscuro: "Oscuro" };
+
+  /** Selector de tema (solo de este dispositivo): se aplica y se guarda al elegir; no toca datos ni la cola de sincronización. */
+  function dibujarTema(): Node {
+    const actual = cargarTema(d.persistencia);
+    const opciones = h("fieldset", { class: "segmentado", id: "ajuste-tema", "aria-describedby": "ayuda-tema" },
+      h("legend", { class: "solo-lectores" }, "Tema"),
+      ...TEMAS.map((t) => {
+        const radio = h("input", { type: "radio", name: "tema", value: t, checked: t === actual }) as HTMLInputElement;
+        radio.addEventListener("change", () => {
+          if (!radio.checked) return;
+          guardarTema(d.persistencia, t);
+          aplicarTema(doc.documentElement, t);
+          accion(() => { aviso = `Tema: ${NOMBRE_TEMA[t]}.`; });
+        });
+        return h("label", {}, radio, h("span", { class: "opcion" }, NOMBRE_TEMA[t]));
+      }));
+    return h("div", {}, h("h2", {}, "Tema"), opciones,
+      h("p", { class: "suave", id: "ayuda-tema" }, "“Sistema” sigue el modo claro u oscuro de tu dispositivo. Se guarda solo en este dispositivo."));
   }
 
   function textoAudioAjustes(e: EstadoAudio): string {

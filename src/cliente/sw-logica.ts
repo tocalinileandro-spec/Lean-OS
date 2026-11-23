@@ -4,7 +4,7 @@
 export const PREFIJOS_API = ["/auth", "/sync", "/export", "/ajustes", "/audio", "/health"] as const;
 
 /** Archivos de la app que se precargan (rutas relativas al alcance del service worker). */
-export const ARCHIVOS_APP = ["./", "index.html", "app.js", "estilos.css", "manifest.webmanifest", "icono-192.png", "icono-512.png"] as const;
+export const ARCHIVOS_APP = ["./", "index.html", "app.js", "estilos.css", "Inter.woff2", "manifest.webmanifest", "icono-192.png", "icono-512.png"] as const;
 
 export type Decision = "red" | "app";
 
