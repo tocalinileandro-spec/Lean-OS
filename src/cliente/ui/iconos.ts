@@ -2,7 +2,8 @@
  * Íconos SVG propios (trazo redondeado, como la maqueta). Se crean con createElementNS: sin innerHTML, sin fuentes de íconos.
  * Siempre decorativos (`aria-hidden`): el texto o la etiqueta accesible va en el control que los contiene.
  */
-export type NombreIcono = "hoy" | "repaso" | "areas" | "tareas" | "apuntes" | "ajustes" | "volver" | "siguiente" | "mas" | "tres-puntos" | "papelera";
+export type NombreIcono = "hoy" | "repaso" | "areas" | "tareas" | "apuntes" | "ajustes" | "volver" | "siguiente" | "mas" | "tres-puntos" | "papelera"
+  | "microfono" | "buscar" | "grafico" | "objetivo" | "nube";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -20,6 +21,11 @@ const TRAZOS: Record<NombreIcono, string[]> = {
   // Tres puntos verticales: segmentos de largo casi cero con trazo grueso y puntas redondas.
   "tres-puntos": ["M12 5h.01", "M12 12h.01", "M12 19h.01"],
   papelera: ["M3 6h18", "M8 6V4h8v2", "M6 6l1 14h10l1-14"],
+  microfono: ["M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z", "M5 11a7 7 0 0 0 14 0", "M12 18v3"],
+  buscar: ["M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z", "M20 20l-4-4"],
+  grafico: ["M5 20v-9", "M12 20V5", "M19 20v-7"],
+  objetivo: ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z", "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"],
+  nube: ["M7 18a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17 9a4.5 4.5 0 0 1 .5 9H7z"],
 };
 const TRAZO_GRUESO: Partial<Record<NombreIcono, string>> = { "tres-puntos": "4" };
 
