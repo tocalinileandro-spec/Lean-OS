@@ -335,6 +335,21 @@ El dueño quitó `scheduled_snapshots = true` de `fly.toml` (commit 699ae7a) por
 
 El revisor señaló dos incoherencias de los criterios nuevos. P18 pedía 36 archivos pero son 3 pantallas × 3 anchos × 2 temas = 18: se corrige a 18 o más. P15 pedía Playwright dentro de `verificar`, que no lo corre: ahora se mide en dos capas. `verificar` comprueba CSS y DOM (media query, tamaños mínimos, barras) y lee `docs/capturas/medicion.json`; `npm run capturas` hace la medición real con Playwright y escribe ese archivo, fallando si hay un control menor a 44 px.
 
+## 2026-11-23 (p-logica: lógica pura de áreas, temas, mover, borrar y restaurar)
+
+Código en `src/compartido/areas.ts` (sin DOM, sin cambios de esquema); papelera en `gestion.ts` y `logica-tareas.ts`; pruebas en `pruebas/areas.test.ts` (P1, P3, P4 parte lógica, P5 parte lógica, P6, P7). `fase-actual.ts`: P1-P19 en `TODOS_LOS_IDS` y `FASE_DE_CADA_ID` (fase 7); exigibles solo P1, P3, P6, P7 (P4 y P5 se suman cuando esté su UI).
+
+- **Cola del Repaso:** `construirCola` no se tocó. El filtro por área es `filtrarColaPorArea` sobre la cola global ya construida, así el tope de nuevas se aplica antes y los contadores suman.
+- **Tema:** importación viva + su apunte (`apunte_id` o apunte con `importacion_id`) + tarjetas vivas con esa `importacion_id` que sigan en el área de la importación. Una tarjeta del tema movida a mano a otra área pasa a ser "suelta" allí; no se mueve ni se borra con el tema.
+- **Estado del tema:** "N hoy" si alguna tarjeta del tema está en la cola de hoy; "Nuevo" si ninguna toca hoy y todas las activas son nuevas (por ejemplo, fuera del tope diario); "Al día" en el resto (incluye temas sin tarjetas activas).
+- **Crear área:** el nombre se limpia (espacios) y se compara normalizado y por padre contra áreas vivas; repetido devuelve `{creada:false, aviso:"Ya existe…"}` sin duplicar; vacío, solo signos, más de 60 letras, nombre con ">" o padre inexistente/borrado/subárea lanzan error en castellano. Si el repetido está en la papelera, se crea uno nuevo (no se resucita).
+- **Apuntes en la cascada de un área:** se borran los de tipo `aprendizaje` ligados por `importacion_id` o por `area_id`; las ideas y apuntes comunes con esa área no se borran (es lo más simple que no pierde datos).
+- **Borrado en cascada:** un solo `deleted_at` para todo el conjunto y un solo `guardarLote`; solo se toca lo vivo (lo borrado antes conserva su instante). Si se borra una subárea y después su área, la subárea queda como item propio en la papelera.
+- **Restaurar:** devuelve exactamente lo que tiene el mismo `deleted_at` que la cabeza. Si el área padre (o el área del tema) está borrada, NO se restaura sola: error claro "primero restaurá su área…" (no pierde ni mezcla datos). Restaurar algo que ya está vivo da un error en castellano y no cambia nada.
+- **Papelera:** `listarPapelera` suma `conjuntos` y deja fuera de `tarjetas`/`apuntes` lo que viaja en un conjunto; `itemsPapelera` muestra un item `tema` o `area` (con `detalle`, por ejemplo "2 subáreas, 3 temas, 40 tarjetas") y `restaurarItem` restaura el conjunto. Las subáreas se muestran como tipo `area` con título "Área › Subárea". `purgarPapelera` incluye ahora `areas`.
+- **Mover tema:** actualiza `area_id` de importación, apunte y tarjetas vivas (con `updated_at` y, en tarjetas, `contenido_updated_at`); no toca el estado de repaso ni `repaso_updated_at`. Tarjetas ya borradas del tema se quedan.
+- **Límite conocido:** `totalParaHoy` es el largo de la cola; si una tarjeta viva apunta a un área borrada (por ejemplo, restaurada suelta) no aparece en ningún área y la suma no coincidiría. No ocurre con los flujos de esta tarea.
+
 ## 2026-11-23 (p-migracion: leer el respaldo del Lean OS original, P10 y P11)
 
 - **Archivos nuevos:** `src/compartido/zip.ts` (lector ZIP mínimo) y `src/compartido/migracion-original.ts` (`importarRespaldoOriginal`). Sin dependencias nuevas. Fixture: `pruebas/fixtures/respaldo-original.zip`, generado con el código real del prototipo (`pruebas/fixtures/generar-respaldo-original.py`, ver su cabecera).

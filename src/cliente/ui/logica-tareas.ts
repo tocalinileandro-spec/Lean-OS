@@ -1,6 +1,7 @@
 /**
  * Lógica de pantalla de los módulos 2 y 3 (tareas, metas, apuntes, papelera): sin DOM, para poder probarla.
  */
+import { restaurarArea, restaurarTema } from "../../compartido/areas.ts";
 import { listarPapelera, restaurarApunte, restaurarTarjeta } from "../../compartido/gestion.ts";
 import { tituloApunte, buscarApuntes, type FiltrosApuntes } from "../../compartido/apuntes.ts";
 import type { Apunte, EstadoMeta, Id, Meta, Tarea } from "../../compartido/esquema.ts";
@@ -74,22 +75,28 @@ export async function vistaApuntes(d: Dependencias, filtros: FiltrosApuntes): Pr
 
 // ---------- Papelera ----------
 
-export type TipoPapelera = "tarjeta" | "tarea" | "meta" | "apunte";
+export type TipoPapelera = "tarjeta" | "tarea" | "meta" | "apunte" | "tema" | "area";
 
 export interface ItemPapelera {
   tipo: TipoPapelera;
   id: Id;
   titulo: string;
   borrado: string;
+  /** Solo en temas y áreas: qué lleva el conjunto, por ejemplo "2 subáreas, 3 temas, 40 tarjetas". */
+  detalle?: string;
 }
 
-const NOMBRE_TIPO: Record<TipoPapelera, string> = { tarjeta: "Tarjeta", tarea: "Tarea", meta: "Meta", apunte: "Apunte" };
+const NOMBRE_TIPO: Record<TipoPapelera, string> = { tarjeta: "Tarjeta", tarea: "Tarea", meta: "Meta", apunte: "Apunte", tema: "Tema", area: "Área" };
 export const nombreTipoPapelera = (t: TipoPapelera) => NOMBRE_TIPO[t];
 
 /** Todo lo borrado (tarjetas, tareas, metas y apuntes), lo más reciente primero. */
 export async function itemsPapelera(d: Dependencias): Promise<ItemPapelera[]> {
   const p = await listarPapelera(d.almacen);
   const items: ItemPapelera[] = [
+    ...p.conjuntos.map((c) => ({
+      tipo: c.tipo, id: c.id, titulo: c.titulo, borrado: c.borrado,
+      detalle: [c.subareas > 0 ? `${c.subareas} ${c.subareas === 1 ? "subárea" : "subáreas"}` : "", c.tipo === "area" ? `${c.temas} ${c.temas === 1 ? "tema" : "temas"}` : "", `${c.tarjetas} ${c.tarjetas === 1 ? "tarjeta" : "tarjetas"}`].filter(Boolean).join(", "),
+    })),
     ...p.tarjetas.map((x) => ({ tipo: "tarjeta" as const, id: x.id, titulo: x.pregunta, borrado: x.deleted_at! })),
     ...p.tareas.map((x) => ({ tipo: "tarea" as const, id: x.id, titulo: x.titulo, borrado: x.deleted_at! })),
     ...p.metas.map((x) => ({ tipo: "meta" as const, id: x.id, titulo: etiquetaMeta(x), borrado: x.deleted_at! })),
@@ -99,6 +106,8 @@ export async function itemsPapelera(d: Dependencias): Promise<ItemPapelera[]> {
 }
 
 export async function restaurarItem(d: Dependencias, tipo: TipoPapelera, id: Id): Promise<string> {
+  if (tipo === "tema") { await restaurarTema(d.almacen, d.reloj, id); return "Tema restaurado con sus tarjetas y su resumen."; }
+  if (tipo === "area") { await restaurarArea(d.almacen, d.reloj, id); return "Área restaurada con todo lo que se borró junto con ella."; }
   if (tipo === "tarjeta") await restaurarTarjeta(d.almacen, d.reloj, id);
   else if (tipo === "tarea") await restaurarTarea(d.almacen, d.reloj, id);
   else if (tipo === "meta") await restaurarMeta(d.almacen, d.reloj, id);
