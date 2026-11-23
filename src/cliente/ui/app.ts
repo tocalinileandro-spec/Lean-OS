@@ -1250,6 +1250,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       informe = r;
       // Si hubo errores el texto queda en la caja para corregirlo; si no, se limpia.
       textoImport = r.errores.length > 0 ? r.texto_original : "";
+      focoEn = "importar-informe"; // el informe queda a la vista
     });
     const cancelar = () => accion(() => { limpiarResultadosImportar(); focoEn = "caja-importar"; });
     const partes: Hijo[] = [];
@@ -1272,7 +1273,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       }
     }
     if (informe) {
-      partes.push(h("div", { class: "informe", role: "status" },
+      partes.push(h("div", { class: "informe", role: "status", id: "importar-informe", tabindex: "-1" },
         h("p", {}, h("strong", {}, `Creadas: ${informe.creadas}`), ` · Duplicadas omitidas: ${informe.duplicadas} · Errores: ${informe.errores.length}`),
         informe.errores.length > 0 && h("ul", { class: "errores" }, ...informe.errores.map((e) => h("li", {}, e))),
         informe.avisos.length > 0 && h("ul", { class: "avisos" }, ...informe.avisos.map((a) => h("li", {}, a)))));

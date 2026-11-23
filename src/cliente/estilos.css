@@ -276,6 +276,9 @@ label { display: block; margin: var(--e3) 0; font-weight: 600; } label > * { mar
 .importar .importar-zona { margin-top: var(--e3); }
 .recordatorio { margin: 0; padding: var(--e3) var(--e4); border-radius: var(--radio-chico); background: var(--acento-suave); color: var(--acento-tinta); font-weight: 600; }
 .vista-previa:focus, .informe:focus { outline: none; }
+/* Textos largos sin espacios (URLs, nombres): se cortan en vez de ensanchar la página */
+h1, h2, h3, p, li, .pregunta, .pista, .respuesta, .respuesta p, .informe, .grupo, .lista .texto, .contexto { overflow-wrap: anywhere; min-width: 0; }
+.lista li, .tarjeta-repaso, .respuesta, .informe, .importar, .bloque-previo { max-width: 100%; }
 .vista-previa { display: flex; flex-direction: column; gap: var(--e3); }
 .vista-previa-total { margin: 0; }
 .bloque-previo { display: flex; flex-direction: column; gap: var(--e2); padding: var(--e4) var(--e5); background: var(--superficie-2); border: 1px solid var(--borde); border-radius: var(--radio-chico); }

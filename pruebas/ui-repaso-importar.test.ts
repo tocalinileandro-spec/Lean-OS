@@ -117,7 +117,7 @@ const BLOQUE = (areaTexto: string, tema: string, pregs: number, resumen: string 
 const sinEstilosEnLinea = (ui: { doc: { querySelectorAll(s: string): ArrayLike<unknown> } }) => expect(ui.doc.querySelectorAll("[style]")).toHaveLength(0);
 
 describe("P4 (UI): Repaso con chips", () => {
-  it("P4 (UI): los chips 'Qué repasar' muestran 'Todo lo de hoy' y cada área con su contador; las áreas suman el total", async () => {
+  it("P4: los chips 'Qué repasar' muestran 'Todo lo de hoy' y cada área con su contador; las áreas suman el total", async () => {
     const a = new AlmacenMemoria();
     await datosP1(a);
     const ui = await abrir(a);
@@ -137,7 +137,7 @@ describe("P4 (UI): Repaso con chips", () => {
     sinEstilosEnLinea(ui);
   });
 
-  it("P4 (UI): elegir un área filtra (incluye sus subáreas) y muestra la fila 'Subárea'; elegir una subárea solo lo suyo", async () => {
+  it("P4: elegir un área filtra (incluye sus subáreas) y muestra la fila 'Subárea'; elegir una subárea solo lo suyo", async () => {
     const a = new AlmacenMemoria();
     await datosP1(a);
     const ui = await abrir(a);
@@ -168,7 +168,7 @@ describe("P4 (UI): Repaso con chips", () => {
     expect(ui.doc.querySelector('[aria-label="Subárea"]')).toBeNull();
   });
 
-  it("P4 (UI): el filtro se mantiene mientras se califica; 'Otra vez' reencola y el total crece; el tope de nuevas se respeta", async () => {
+  it("P4: el filtro se mantiene mientras se califica; 'Otra vez' reencola y el total crece; el tope de nuevas se respeta", async () => {
     const a = new AlmacenMemoria();
     await datosP1(a);
     const ui = await abrir(a, new RelojSimulado(AHORA));
@@ -205,7 +205,7 @@ describe("P4 (UI): Repaso con chips", () => {
     sinEstilosEnLinea(ui);
   });
 
-  it("P4 (UI): un chip con 0 es válido y muestra el estado vacío con la fecha de lo próximo; 'Ver áreas' y 'Volver a Hoy' están", async () => {
+  it("P4: un chip con 0 es válido y muestra el estado vacío con la fecha de lo próximo; 'Ver áreas' y 'Volver a Hoy' están", async () => {
     const a = new AlmacenMemoria();
     await datosP1(a);
     const ui = await abrir(a);
@@ -227,7 +227,7 @@ describe("P4 (UI): Repaso con chips", () => {
     expect(ui.doc.querySelector(".tarjeta-repaso .pregunta")!.textContent).toMatch(/^pregunta/);
   });
 
-  it("P4 (UI): al terminar la sesión dice 'Listo: repasaste N' y cuándo toca lo próximo (la fecha de las tarjetas activas del filtro)", async () => {
+  it("P4: al terminar la sesión dice 'Listo: repasaste N' y cuándo toca lo próximo (la fecha de las tarjetas activas del filtro)", async () => {
     const a = new AlmacenMemoria();
     await a.areas.guardarVarios([area("x", "Ciencias"), area("y", "Arte")]);
     await a.tarjetas.guardarVarios([tj("x"), tj("x"), tj("y", { intervalo: 9, reps: 3, vence: "2027-01-15" })]);
@@ -246,7 +246,7 @@ describe("P4 (UI): Repaso con chips", () => {
     expect(ui.boton("Deshacer")).toBeUndefined(); // sesión nueva: nada que deshacer
   });
 
-  it("P4 (UI): 'Repasar esta área' del detalle abre el Repaso con ese filtro marcado", async () => {
+  it("P4: 'Repasar esta área' del detalle abre el Repaso con ese filtro marcado", async () => {
     const a = new AlmacenMemoria();
     const r = new RelojSimulado(AHORA);
     await importar(a, r, JSON.stringify(BLOQUE("Programación > CS50", "Funciones", 3)));
@@ -261,7 +261,7 @@ describe("P4 (UI): Repaso con chips", () => {
     expect(ui.chip("Subárea", "Toda el área")!.getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("P4 (UI): en el celular los chips se deslizan dentro de su fila y las reglas del Repaso no usan estilos en línea", () => {
+  it("P4: en el celular los chips se deslizan dentro de su fila y las reglas del Repaso no usan estilos en línea", () => {
     const movil = CSS.slice(CSS.indexOf("@media (max-width: 640px) {\n  .repaso { gap"));
     expect(movil).toMatch(/\.chips-fila\.chips \{[^}]*flex-wrap: nowrap;[^}]*overflow-x: auto/);
     expect(movil).toMatch(/\.chips-fila \.chip \{[^}]*white-space: nowrap/);
@@ -284,7 +284,7 @@ describe("P5 (UI): la tarjeta con su contexto, el progreso y el resumen del tema
     return { a, r, ui };
   }
 
-  it("P5 (UI): la etiqueta dice 'Área › Subárea · Tema', 'Área · Tema' o 'Área › Subárea' según la tarjeta", async () => {
+  it("P5: la etiqueta dice 'Área › Subárea · Tema', 'Área · Tema' o 'Área › Subárea' según la tarjeta", async () => {
     const { ui } = await tresTarjetas();
     await ui.clicChip("Qué repasar", "Programación");
     await ui.clicChip("Subárea", "CS50");
@@ -299,7 +299,7 @@ describe("P5 (UI): la tarjeta con su contexto, el progreso y el resumen del tema
     expect(ui.doc.querySelector(".tarjeta-repaso h1.pregunta")!.textContent).toBe("Creada a mano");
   });
 
-  it("P5 (UI): los cuatro botones muestran el intervalo siguiente (R1 a R4) y se ve 'Tarjeta N de M'", async () => {
+  it("P5: los cuatro botones muestran el intervalo siguiente (R1 a R4) y se ve 'Tarjeta N de M'", async () => {
     const { ui } = await tresTarjetas();
     await ui.clicChip("Qué repasar", "Idiomas");
     expect(ui.texto()).toContain("Tarjeta 1 de 1");
@@ -314,7 +314,7 @@ describe("P5 (UI): la tarjeta con su contexto, el progreso y el resumen del tema
     expect(ui.texto()).toContain("Faltan 0");
   });
 
-  it("P5 (UI): 'Ver el resumen del tema' abre el resumen sin revelar la respuesta ni cambiar la sesión (R9 intacto)", async () => {
+  it("P5: 'Ver el resumen del tema' abre el resumen sin revelar la respuesta ni cambiar la sesión (R9 intacto)", async () => {
     const { a, ui } = await tresTarjetas();
     await ui.clicChip("Qué repasar", "Idiomas");
     const respuesta = "respuesta secreta Verbos 0";
@@ -361,7 +361,7 @@ describe("P5 (UI): la tarjeta con su contexto, el progreso y el resumen del tema
     sinEstilosEnLinea(ui);
   });
 
-  it("P5 (UI): sin resumen (o tarjeta creada a mano) el enlace no aparece", async () => {
+  it("P5: sin resumen (o tarjeta creada a mano) el enlace no aparece", async () => {
     const { ui } = await tresTarjetas();
     await ui.clicChip("Qué repasar", "Programación");
     await ui.clicChip("Subárea", "Manuales");
@@ -373,7 +373,7 @@ describe("P5 (UI): la tarjeta con su contexto, el progreso y el resumen del tema
     expect(vistas).toEqual({ "Programación › CS50 · Funciones": true, "Programación › CS50 · Sin resumen": false });
   });
 
-  it("P5 (UI): R9 con filtros: la respuesta no está hasta 'Ver respuesta' en ningún chip; la ayuda de atajos está, y el CSS la oculta en el celular", async () => {
+  it("P5: R9 con filtros: la respuesta no está hasta 'Ver respuesta' en ningún chip; la ayuda de atajos está, y el CSS la oculta en el celular", async () => {
     const { ui } = await tresTarjetas();
     for (const c of ["Todo lo de hoy", "Programación", "Idiomas"]) {
       await ui.clicChip("Qué repasar", c);
@@ -427,6 +427,7 @@ describe("P8: importar con revisión", () => {
     await ui.clic("Revisar");
     await ui.clic("Confirmar importación");
     expect(ui.texto()).toContain("Creadas: 3 · Duplicadas omitidas: 0 · Errores: 0");
+    expect(ui.doc.activeElement!.id).toBe("importar-informe"); // el informe recibe el foco (queda a la vista)
     const ts = await a.tarjetas.listar();
     expect(ts).toHaveLength(3);
     expect(ts.every((t) => t.ease === 2.5 && t.vence === HOY)).toBe(true);
@@ -649,7 +650,7 @@ describe("P10 (UI) y P11 (UI): importar el respaldo del Lean OS original desde A
   const mala = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   const totales = async (a: AlmacenMemoria) => ({ t: (await a.tarjetas.listar()).length, ar: (await a.areas.listar()).length, im: (await a.importaciones.listar()).length, ap: (await a.apuntes.listar()).length });
 
-  it("P10 (UI): la sección existe en Ajustes con explicación y un campo de archivos múltiple para .zip y .json", async () => {
+  it("P10: la sección existe en Ajustes con explicación y un campo de archivos múltiple para .zip y .json", async () => {
     const ui = await abrir(new AlmacenMemoria(), new RelojSimulado(AHORA), archivos);
     await ui.ir("ajustes");
     expect(ui.doc.querySelector("#migracion h2")!.textContent).toBe("Importar respaldo del Lean OS original");
@@ -662,7 +663,7 @@ describe("P10 (UI) y P11 (UI): importar el respaldo del Lean OS original desde A
     sinEstilosEnLinea(ui);
   });
 
-  it("P10 (UI): el ZIP del original crea áreas, subáreas, temas y tarjetas, y el informe lo cuenta en castellano", async () => {
+  it("P10: el ZIP del original crea áreas, subáreas, temas y tarjetas, y el informe lo cuenta en castellano", async () => {
     const a = new AlmacenMemoria();
     const ui = await abrir(a, new RelojSimulado(AHORA), archivos);
     await ui.ir("ajustes");
@@ -677,7 +678,7 @@ describe("P10 (UI) y P11 (UI): importar el respaldo del Lean OS original desde A
     expect(ui.texto()).not.toMatch(/undefined|Error:|\[object/);
   });
 
-  it("P10 (UI): el ejemplo del prototipo da 3 tarjetas en CS50 con su pista", async () => {
+  it("P10: el ejemplo del prototipo da 3 tarjetas en CS50 con su pista", async () => {
     const a = new AlmacenMemoria();
     const ui = await abrir(a, new RelojSimulado(AHORA), archivos);
     await ui.ir("ajustes");
@@ -690,7 +691,7 @@ describe("P10 (UI) y P11 (UI): importar el respaldo del Lean OS original desde A
     expect(ts.find((t) => t.pregunta === "¿Qué guarda un puntero?")!.pista).toBe("Piensa en una dirección postal, no en la casa.");
   });
 
-  it("P11 (UI): repetir la importación crea 0 y todas son duplicadas; elegir varios archivos a la vez funciona; lo calificado se conserva", async () => {
+  it("P11: repetir la importación crea 0 y todas son duplicadas; elegir varios archivos a la vez funciona; lo calificado se conserva", async () => {
     const a = new AlmacenMemoria();
     const ui = await abrir(a, new RelojSimulado(AHORA), archivos);
     await ui.ir("ajustes");
@@ -712,7 +713,7 @@ describe("P10 (UI) y P11 (UI): importar el respaldo del Lean OS original desde A
     expect((await a.tarjetas.listar()).length).toBeGreaterThanOrEqual(11);
   });
 
-  it("P11 (UI): un archivo dañado o ajeno da un mensaje en castellano y no cambia nada; los buenos del mismo grupo se importan", async () => {
+  it("P11: un archivo dañado o ajeno da un mensaje en castellano y no cambia nada; los buenos del mismo grupo se importan", async () => {
     const a = new AlmacenMemoria();
     const ui = await abrir(a, new RelojSimulado(AHORA), {
       ...archivos, "roto.zip": mala, "ajeno.json": new TextEncoder().encode(JSON.stringify({ hola: "mundo" })), "texto.json": new TextEncoder().encode("esto no es json"),
@@ -733,7 +734,7 @@ describe("P10 (UI) y P11 (UI): importar el respaldo del Lean OS original desde A
     expect(ui.doc.querySelectorAll("#migracion .informe .errores li")).toHaveLength(1);
   });
 
-  it("P11 (UI): si no se puede leer un archivo, se avisa en castellano y el campo queda listo para elegir de nuevo", async () => {
+  it("P11: si no se puede leer un archivo, se avisa en castellano y el campo queda listo para elegir de nuevo", async () => {
     const a = new AlmacenMemoria();
     const ui = await abrir(a, new RelojSimulado(AHORA), archivos);
     await ui.ir("ajustes");
@@ -746,7 +747,7 @@ describe("P10 (UI) y P11 (UI): importar el respaldo del Lean OS original desde A
     expect((await a.tarjetas.listar()).length).toBe(3);
   });
 
-  it("P10 (UI): sin dependencia inyectada lee los bytes del archivo con File.arrayBuffer()", async () => {
+  it("P10: sin dependencia inyectada lee los bytes del archivo con File.arrayBuffer()", async () => {
     const a = new AlmacenMemoria();
     const ventana = new Window({ url: "http://localhost/" });
     const raiz = ventana.document.createElement("div");
@@ -759,5 +760,14 @@ describe("P10 (UI) y P11 (UI): importar el respaldo del Lean OS original desde A
     input.dispatchEvent(new ventana.Event("change", { bubbles: true }) as unknown as Event);
     await app.esperar();
     expect((await a.tarjetas.listar()).length).toBe(3);
+  });
+});
+
+describe("P8: textos largos sin desborde", () => {
+  it("P8: el CSS corta los textos largos sin espacios en preguntas, respuestas, pistas, títulos, listas, informes y vista previa", () => {
+    const regla = CSS.match(/h1, h2, h3, p, li,[^{]*\{[^}]*\}/)![0];
+    for (const sel of [".pregunta", ".pista", ".respuesta p", ".informe", ".grupo", ".lista .texto", ".contexto"]) expect(regla).toContain(sel);
+    expect(regla).toContain("overflow-wrap: anywhere");
+    expect(regla).toContain("min-width: 0");
   });
 });
