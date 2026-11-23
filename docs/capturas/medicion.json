@@ -1,0 +1,30 @@
+{
+  "generado": "2026-11-23",
+  "anchos": [
+    390,
+    768,
+    1440
+  ],
+  "temas": [
+    "claro",
+    "oscuro"
+  ],
+  "pantallas": [
+    "hoy",
+    "repaso",
+    "areas",
+    "area",
+    "tarjetas",
+    "tareas",
+    "apuntes",
+    "ajustes"
+  ],
+  "incumplimientos": [],
+  "informativos": [],
+  "resumen": {
+    "controlesMedidos": 2274,
+    "incumplimientos": 0,
+    "scrollHorizontal": 0,
+    "navegacionCorrecta": true
+  }
+}
