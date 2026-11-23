@@ -93,6 +93,34 @@ export function guardarAjustes(p: Persistencia, a: Ajustes): void {
   fijarHoraCambio(a.horaCambio);
 }
 
+// ---------- Tema (solo de este dispositivo: no se sincroniza ni toca datos) ----------
+
+export const TEMAS = ["sistema", "claro", "oscuro"] as const;
+export type Tema = (typeof TEMAS)[number];
+export const TEMA_POR_DEFECTO: Tema = "sistema";
+const CLAVE_TEMA = "lean-os:tema";
+
+/** Cualquier valor ausente, roto o desconocido vale "sistema". */
+export function cargarTema(p: Persistencia): Tema {
+  try {
+    const v = p.getItem(CLAVE_TEMA);
+    return (TEMAS as readonly string[]).includes(v ?? "") ? (v as Tema) : TEMA_POR_DEFECTO;
+  } catch {
+    return TEMA_POR_DEFECTO;
+  }
+}
+
+export function guardarTema(p: Persistencia, t: Tema): void {
+  if (!(TEMAS as readonly string[]).includes(t)) return;
+  p.setItem(CLAVE_TEMA, t);
+}
+
+/** "sistema" quita `data-tema` (manda prefers-color-scheme); "claro" y "oscuro" lo fijan en <html>. */
+export function aplicarTema(html: { setAttribute(k: string, v: string): void; removeAttribute(k: string): void }, t: Tema): void {
+  if (t === "claro" || t === "oscuro") html.setAttribute("data-tema", t);
+  else html.removeAttribute("data-tema");
+}
+
 // ---------- Áreas ----------
 
 export function nombreDeArea(area: Area, areas: Area[]): string {
@@ -122,6 +150,12 @@ export async function vistaHoy(d: Dependencias): Promise<VistaHoy> {
     pendientes: (await construirCola(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia })).length,
     estadisticas: await calcularEstadisticas(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia }),
   };
+}
+
+/** Tarjetas que hoy están para repasar (insignia de la barra). */
+export async function cantidadParaRepasar(d: Dependencias): Promise<number> {
+  const aj = cargarAjustes(d.persistencia);
+  return (await construirCola(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia })).length;
 }
 
 // ---------- Repaso ----------

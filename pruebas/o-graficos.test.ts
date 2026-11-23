@@ -203,7 +203,7 @@ describe("O23: dibujo con SVG propio", () => {
     const fuente = readFileSync(new URL("../src/cliente/ui/graficos-svg.ts", import.meta.url), "utf8");
     expect(fuente).not.toMatch(/innerHTML|#[0-9a-fA-F]{6}\b|fetch\(|XMLHttpRequest/);
     const html = readFileSync(new URL("../src/cliente/index.html", import.meta.url), "utf8");
-    expect(html).toContain(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'">`);
+    expect(html).toContain(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'">`);
   });
 
   class Memoria implements Persistencia {
@@ -256,7 +256,7 @@ describe("O23: dibujo con SVG propio", () => {
     expect(doc.querySelector("#panel-estadisticas")).toBeNull();
     expect(await antes()).toBe(cuenta);
     // La navegación no ganó pantallas.
-    expect([...doc.querySelectorAll(".nav-item")].map((b) => b.textContent)).toEqual(["Hoy", "Repaso", "Tareas", "Apuntes", "Tarjetas", "Ajustes"]);
+    expect([...doc.querySelectorAll(".nav-item .nav-texto")].map((b) => b.textContent)).toEqual(["Hoy", "Repaso", "Áreas", "Tareas", "Apuntes"]);
   });
 
   it("O23: el panel sin datos muestra estados vacíos", async () => {

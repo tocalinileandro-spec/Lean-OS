@@ -6,12 +6,13 @@ import { AlmacenSincronizado, Candado } from "./sync/cola.ts";
 import { MotorSync } from "./sync/motor.ts";
 import { iniciarPurga } from "./purga.ts";
 import { montarApp } from "./ui/app.ts";
-import { cargarAjustes } from "./ui/logica.ts";
+import { aplicarTema, cargarAjustes, cargarTema } from "./ui/logica.ts";
 
 async function arrancar(): Promise<void> {
   const raiz = document.getElementById("app")!;
   try {
     const persistencia = localStorage;
+    aplicarTema(document.documentElement, cargarTema(persistencia));
     fijarHoraCambio(cargarAjustes(persistencia).horaCambio);
     const crudo = await AlmacenIndexedDB.abrir();
     const cola = crudo.cola;
