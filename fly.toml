@@ -33,7 +33,6 @@ primary_region = "eze" # Buenos Aires
   source = "lean_os_data"
   destination = "/data"
   initial_size = "1gb"
-  scheduled_snapshots = true
   snapshot_retention = 60 # días; el máximo que permite Fly
 
 # Con un solo volumen no puede haber dos máquinas a la vez: se reemplaza la máquina en el lugar.
