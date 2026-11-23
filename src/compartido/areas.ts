@@ -386,9 +386,24 @@ export async function resumenDeBorrado(almacen: Almacen, objetivo: ObjetivoDeBor
   const r = resumirConjunto(await reunir(almacen, cabeza, vivo2, true));
   return { ...r, texto: textoResumen(r) };
 }
+/**
+ * Instante de borrado que no choca con ningún `deleted_at` ya existente (áreas, importaciones, apuntes, tarjetas):
+ * si el reloj no avanzó desde otro borrado, suma 1 ms hasta quedar libre. Así restaurar un conjunto nunca
+ * resucita lo que se borró antes.
+ */
+async function instanteLibre(almacen: Almacen, reloj: Reloj): Promise<string> {
+  const usados = new Set<string>();
+  for (const repo of [almacen.areas, almacen.importaciones, almacen.apuntes, almacen.tarjetas] as const) {
+    for (const x of await repo.listar({ incluirBorrados: true })) if (x.deleted_at !== null) usados.add(x.deleted_at);
+  }
+  let ms = reloj.ahora().getTime();
+  while (usados.has(new Date(ms).toISOString())) ms++;
+  return new Date(ms).toISOString();
+}
+
 async function borrarConjunto(almacen: Almacen, reloj: Reloj, cabeza: Cabeza): Promise<ResumenConjunto> {
   const c = await reunir(almacen, cabeza, vivo2, true);
-  const ahora = reloj.ahora().toISOString(); // UN solo instante para todo el conjunto
+  const ahora = await instanteLibre(almacen, reloj); // UN solo instante para todo el conjunto
   await almacen.guardarLote({
     areas: c.areas.map((x) => ({ ...x, deleted_at: ahora, updated_at: ahora })),
     importaciones: c.importaciones.map((x) => ({ ...x, deleted_at: ahora, updated_at: ahora })),

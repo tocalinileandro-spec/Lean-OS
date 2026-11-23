@@ -439,4 +439,37 @@ describe("P7: borrar y restaurar en cascada", () => {
     expect(await a.repasos.listar()).toHaveLength(1);
     expect((await a.importaciones.listar({ incluirBorrados: true })).map((i) => i.tema)).toEqual(["Verbos"]);
   });
+
+  it("P7: con el reloj sin avanzar, tema borrado y luego su área: restaurar el área no resucita el tema y la papelera muestra ambos", async () => {
+    const { a, r } = nuevo();
+    const s = await sembrarTemas(a, r);
+    const f = s.imp("Funciones");
+    await borrarTema(a, r, f.id);
+    await borrarArea(a, r, s.prog); // mismo reloj
+    const instantes = [(await a.importaciones.obtener(f.id))!.deleted_at, (await a.areas.obtener(s.prog))!.deleted_at];
+    expect(instantes[0]).not.toBe(instantes[1]);
+    const d = { almacen: a, reloj: r } as never;
+    expect((await itemsPapelera(d)).map((i) => `${i.tipo}:${i.titulo}`).sort()).toEqual(["area:Programación", "tema:Funciones"]);
+    await restaurarArea(a, r, s.prog);
+    expect((await a.importaciones.obtener(f.id))!.deleted_at).not.toBeNull();
+    expect((await a.apuntes.obtener(f.apunte_id!))!.deleted_at).not.toBeNull();
+    expect((await a.tarjetas.listar()).filter((t) => t.importacion_id === f.id)).toHaveLength(0);
+    expect((await itemsPapelera(d)).map((i) => i.tipo)).toEqual(["tema"]);
+    expect(await restaurarTema(a, r, f.id)).toEqual({ subareas: 0, temas: 1, tarjetas: 3 });
+  });
+
+  it("P7: con el reloj sin avanzar, subárea borrada y luego el área, y dos borrados seguidos, se restauran por separado", async () => {
+    const { a, r } = nuevo();
+    const s = await sembrarTemas(a, r);
+    await borrarSubarea(a, r, s.py);
+    await borrarArea(a, r, s.prog);
+    await borrarArea(a, r, s.idi);
+    const d = { almacen: a, reloj: r } as never;
+    expect((await itemsPapelera(d)).map((i) => `${i.tipo}:${i.titulo}`).sort()).toEqual(["area:Idiomas", "area:Programación", "area:Programación › Python"]);
+    expect(await restaurarArea(a, r, s.prog)).toMatchObject({ subareas: 1, temas: 2, tarjetas: 5 });
+    expect((await a.areas.obtener(s.py))!.deleted_at).not.toBeNull();
+    expect((await a.areas.obtener(s.idi))!.deleted_at).not.toBeNull();
+    expect(await restaurarArea(a, r, s.py)).toMatchObject({ temas: 1, tarjetas: 2 });
+    expect((await itemsPapelera(d)).map((i) => i.titulo)).toEqual(["Idiomas"]);
+  });
 });
