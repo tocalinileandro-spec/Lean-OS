@@ -26,8 +26,8 @@ const TEMAS = ["claro", "oscuro"] as const;
 const PANTALLAS = ["hoy", "repaso", "areas", "area", "tarjetas", "tareas", "apuntes", "ajustes"] as const;
 const CON_CAPTURA = new Set<string>(["areas", "repaso", "area"]);
 const MINIMO = 44;
-/** Reloj fijo: los datos se importan y repasan el día 1 y se miran el día 2 (así hay tarjetas vencidas). */
-const DIA_SIEMBRA = "2026-11-12T12:00:00-03:00";
+/** Reloj fijo: los datos se importan en agosto, se repasan por meses y se miran el 23 de noviembre (así hay tarjetas dominadas, vencidas y nuevas). */
+const DIA_SIEMBRA = "2026-08-15T12:00:00-03:00";
 const DIA_VISTA = "2026-11-23T12:00:00-03:00";
 
 // ---------- datos de ejemplo ----------
@@ -137,7 +137,7 @@ const BLOQUES: Bloque[] = [
 // Se intercalan las áreas para que las tarjetas nuevas del día (tope diario) queden repartidas entre todas.
 const ORDEN = [0, 6, 8, 10, 3, 7, 9, 11, 1, 4, 2, 5];
 const JSON_IMPORTAR = ORDEN.map((i) => BLOQUES[i]!).map((b) => ({
-  tipo: "aprendizaje", fecha: "2026-11-12", area: b.area, tema: b.tema, resumen: b.resumen,
+  tipo: "aprendizaje", fecha: "2026-08-15", area: b.area, tema: b.tema, resumen: b.resumen,
   preguntas: b.preguntas.map(([p, r]) => ({ p, r, pista: "" })),
 }));
 
@@ -213,15 +213,38 @@ async function sembrar(p: Pagina, url: string, contexto: any): Promise<void> {
   await p.click("#importar-revisar");
   await p.click("#importar-confirmar");
   await p.waitForSelector("#importar-informe");
-  // Repasar algunas tarjetas ese primer día, con distintas calificaciones.
-  await p.locator("nav .nav-item", { hasText: "Repaso" }).click();
-  const notas = [/^Bien/, /^Fácil/, /^Difícil/, /^Bien/, /^Otra vez/, /^Bien/, /^Fácil/, /^Bien/, /^Difícil/, /^Bien/, /^Bien/, /^Fácil/, /^Bien/, /^Bien/];
-  for (const nota of notas) {
-    await p.locator("button", { hasText: /^Ver respuesta/ }).click();
-    await p.locator("button", { hasText: nota }).click();
-    await p.waitForTimeout(60);
+  // Varios meses de estudio: cada seis días se repasa lo que vence, con una política distinta por área,
+  // para que haya porcentajes de "Dominadas" y estados ("Al día" / "N para hoy") variados.
+  const POLITICA: { area: string; nota: RegExp; hasta: string; max: number }[] = [
+    { area: "Negocios", nota: /^Fácil/, hasta: "2026-11-23", max: 99 }, // siempre al día: casi todo dominado
+    { area: "Lógica", nota: /^Fácil/, hasta: "2026-10-30", max: 4 }, // dominado en buena parte, hoy vence
+    { area: "Programación", nota: /^Fácil/, hasta: "2026-10-30", max: 4 }, // poco dominado
+  ];
+  const inicio = Date.parse(DIA_SIEMBRA);
+  const fin = Date.parse(DIA_VISTA);
+  for (let t = inicio; t < fin - 3 * 86_400_000; t += 6 * 86_400_000) {
+    const dia = new Date(t).toISOString().slice(0, 10);
+    if (t !== inicio) {
+      await contexto.clock.setFixedTime(t);
+      await p.reload();
+      await p.waitForSelector("nav .nav-item");
+    }
+    for (const pol of POLITICA) {
+      if (dia > pol.hasta) continue;
+      await p.locator("nav .nav-item", { hasText: "Repaso" }).click();
+      await p.locator("button.chip", { hasText: new RegExp(`^${pol.area}`) }).click();
+      await p.waitForTimeout(150);
+      for (let n = 0; n < pol.max; n++) {
+        const ver = p.locator("button", { hasText: /^Ver respuesta/ });
+        if ((await ver.count()) === 0) break;
+        try {
+          await ver.first().click({ timeout: 4000 });
+          await p.locator("button", { hasText: pol.nota }).first().click({ timeout: 4000 });
+        } catch { break; } // la sesión terminó o se redibujó: se sigue con el próximo área
+        await p.waitForTimeout(60);
+      }
+    }
   }
-  // Pasan once días: lo repasado hace tiempo vence; lo nuevo sigue nuevo.
   await contexto.clock.setFixedTime(DIA_VISTA);
   await p.reload();
   await p.waitForSelector("nav .nav-item");
