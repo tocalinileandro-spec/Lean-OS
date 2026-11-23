@@ -1,13 +1,31 @@
 # Estado
 
-**COMPLETO** (2026-11-22). Todo el alcance pedido está terminado y fusionado en `main` con CI verde. Lo único que falta lo hacés vos: cargar los secretos y desplegar (ver "Qué tenés que hacer vos").
+**EN CURSO** (reabierto el 2026-11-23 por pedido del dueño). Etapa 7: paridad funcional con el Lean OS original (`prototipo/`) + diseño profesional según `docs/maqueta/`. Lo anterior (fases 1 a 5 y opcionales) sigue completo y en `main`.
 
 ## Control de sesión (presupuesto de 20 h)
 
-- **Sesión activa:** ninguna. Cerrada el 2026-11-22 23:49 UTC.
-- **Horas trabajadas en esta sesión:** inicio 2026-11-22 21:54:43 UTC, cierre 23:49 UTC, unas 1,9 h.
-- **Total acumulado:** 1,9 h de 20 h.
-- Si otra sesión lee esto: dice COMPLETO, no hay nada que hacer.
+- **Sesión activa:** desde 2026-11-23 02:24 UTC (Director). Marca de actividad: 2026-11-23 02:24 UTC.
+- **Total acumulado antes de esta sesión:** 1,9 h de 20 h.
+- **Inicio de esta sesión:** 2026-11-23 02:24:04 UTC. Al cerrar se suma lo trabajado.
+
+## Etapa 7: plan y avance
+
+Criterios nuevos: prefijo P en la sección 4 de `docs/VISION.md`. Auditoría y decisiones: `DECISIONES.md` ("Auditoría prototipo vs app nueva").
+
+| Tarea | Qué entrega | IDs | Estado |
+| --- | --- | --- | --- |
+| p-docs | Maqueta a `docs/maqueta`, auditoría, criterios P, ESTADO | (docs) | en curso |
+| p-logica | Lógica pura: resumen de áreas, temas, mover, borrar/restaurar en cascada, crear área/subárea | P1, P3, P6, P7 | pendiente |
+| p-migracion | Leer el respaldo del Lean OS original (ZIP y JSON), sin duplicar | P10, P11 | pendiente |
+| p-diseno-base | Tokens CSS, Inter local, barra superior/inferior, tema oscuro opcional, movimiento reducido | P12-P17 | pendiente |
+| p-pantallas | Áreas (inicio), detalle de área, repaso con chips y etiqueta, importar con revisión, Ajustes | P2, P4, P5, P8, P9 | pendiente |
+| p-rediseno | Hoy, Tareas, Apuntes, Tarjetas y Ajustes con el sistema de diseño | P12-P17 | pendiente |
+| p-capturas | `npm run capturas`, capturas en `docs/capturas/`, revisión visual | P18 | pendiente |
+| p-cierre | Todo verde, ESTADO, listo para desplegar | P19 | pendiente |
+
+Próximo paso exacto: terminar `p-docs` (PR, CI verde, fusionar) y lanzar `p-logica`.
+
+# Historial hasta el cierre anterior (2026-11-22)
 
 ## Qué quedó hecho (todo en `main`)
 
@@ -27,7 +45,7 @@
 
 ## Lo dudoso o sin poder probar (para tu revisión)
 
-- **Claves de snapshot de Fly** (`scheduled_snapshots`, `snapshot_retention = 60` en `fly.toml`): escritas de memoria, sin acceso a la documentación. Si Fly las rechaza, el primer despliegue falla de forma visible (sin perder datos): corregí o quitá esas dos líneas. `SECRETOS.md` explica cómo verificar la retención real con `fly volumes show`.
+- **Claves de snapshot de Fly:** Fly rechazó `scheduled_snapshots` y el dueño la quitó a mano de `fly.toml` (commit 699ae7a); queda `snapshot_retention = 60` en el volumen. La prueba B3 ya no exige `scheduled_snapshots` (ver DECISIONES.md 2026-11-23). `SECRETOS.md` explica cómo verificar la retención real con `fly volumes show`.
 - **Nombre `lean-os` en Fly:** puede estar tomado; si lo está, cambialo en `fly.toml` y en el job de despliegue (los pasos están en `SECRETOS.md`).
 - **`DestinoB2` y `ProveedorGroq`:** escritos de memoria contra las APIs de Backblaze B2 y Groq, sin probarlos contra los servicios reales (aquí no hay claves ni acceso). Están aislados en `src/servidor/destino-b2.ts` y `src/servidor/audio.ts`; las pruebas usan servicios simulados. Probalos a mano al activarlos: "Respaldar ahora" en Ajustes y grabar un audio corto. Que Backblaze permita abrir la cuenta gratis sin tarjeta tampoco lo pude confirmar. La cuota gratuita de Groq tiene tope diario.
 - **Navegador real:** la instalación como PWA, el uso sin conexión con el service worker y la grabación con micrófono se probaron solo con simuladores y la lógica; no en Chrome/Edge reales.
