@@ -608,6 +608,20 @@ describe("P15 (CSS): controles de 44 px y elementos fijos del rediseño", () => 
   });
 });
 
+describe("P15 (CSS): los botones de acción no parten palabras a 390 px", () => {
+  it("P15: los botones de .acciones y .barra no se parten (nowrap) y las columnas de acciones en celular son de 7rem o más", () => {
+    for (const sel of [".acciones .boton", ".barra .boton"]) {
+      expect(regla(sel).some((r) => r.decl.get("white-space") === "nowrap"), sel).toBe(true);
+    }
+    for (const sel of [".lista li .acciones", ".lista.tarjetas li .acciones"]) {
+      const g = regla(sel, "(max-width: 640px)")[0]!.decl.get("grid-template-columns")!;
+      const m = /minmax\(([\d.]+)rem/.exec(g);
+      expect(Number(m![1]), sel).toBeGreaterThanOrEqual(7);
+    }
+    expect(regla(".lista li.edicion").some((r) => /var\(--e3\)$/.test(r.decl.get("margin") ?? "")), "separación bajo el formulario de edición").toBe(true);
+  });
+});
+
 describe("P16: movimiento de los componentes del rediseño", () => {
   it("P16: las transiciones nuevas son de color o transform y no hay animaciones con @keyframes", () => {
     const t = tokens("claro");

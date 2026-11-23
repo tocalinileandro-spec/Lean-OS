@@ -602,5 +602,11 @@ input[type="checkbox"].interruptor { appearance: none; -webkit-appearance: none;
 .lista li.edicion > * { max-width: 40rem; }
 .pantalla-tareas > ul.lista { margin-bottom: var(--e5); }
 @media (max-width: 640px) {
-  .lista.tarjetas li .acciones { grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); }
+  .lista.tarjetas li .acciones { grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); }
 }
+
+/* Los botones de acción no parten palabras (en celular pasan a otra fila en vez de cortarse) */
+.acciones .boton, .barra .boton { white-space: nowrap; }
+.lista li.edicion { margin: var(--e2) var(--e2) var(--e3); }
+.lista > li.edicion + li, .lista > li + li.edicion { margin-top: var(--e2); }
+.lista li.edicion + li { border-top: 1px solid var(--borde); }
