@@ -1,6 +1,8 @@
 # Estado
 
-**COMPLETO** (2026-11-23). Etapa 7 terminada: paridad funcional con el Lean OS original (`prototipo/`) y diseño profesional según `docs/maqueta/`, todo en `main` con CI verde. Para dejarlo en producción solo falta lo de siempre: cargar los secretos y desplegar (ver "Qué tenés que hacer vos" más abajo).
+**EN CURSO** (2026-11-23, reabierto por pedido del dueño: repaso libre, P20-P22). La etapa 7 anterior sigue completa en `main`.
+
+**COMPLETO (etapa 7)** (2026-11-23). Etapa 7 terminada: paridad funcional con el Lean OS original (`prototipo/`) y diseño profesional según `docs/maqueta/`, todo en `main` con CI verde. Para dejarlo en producción solo falta lo de siempre: cargar los secretos y desplegar (ver "Qué tenés que hacer vos" más abajo).
 
 ## Control de sesión (presupuesto de 20 h)
 

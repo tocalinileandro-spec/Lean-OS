@@ -57,6 +57,8 @@ Tres módulos y seis pantallas: Áreas (la de inicio), Repaso, Hoy, Tareas, Apun
 
 La cola del día va así: primero las vencidas (las más atrasadas primero), después las nuevas (hasta 20 por día, configurable). Las tarjetas calificadas “Otra vez” vuelven al final de la cola.
 
+**Repaso libre.** Además de la cola del día, se puede repasar todo sin importar la fecha: en Repaso, “Repasar todo” (de todo, de un área o de una subárea) arma una sesión con todas las tarjetas activas del filtro (sin suspendidas ni borradas), sin tope de nuevas. Es práctica: calificar no cambia el calendario (ease, intervalo, reps, lapses y vencimiento quedan como estaban), no crea registros de repaso (las estadísticas, la racha, la retención y los contadores “para hoy” no se mueven) y no entra en la cola de sincronización. Los cuatro botones siguen, pero solo ordenan la sesión: “Otra vez” vuelve la tarjeta al final y las otras la pasan; no muestran intervalos. La pantalla avisa que es modo libre y se sale con un botón.
+
 **Cálculo del próximo repaso** (estilo SM-2). Cada tarjeta guarda ease (arranca en 2,5), intervalo en días, reps (repasos seguidos sin fallar), lapses (fallos) y fecha de vencimiento.
 
 | Botón | Intervalo nuevo | Ease |
@@ -137,7 +139,7 @@ Ante cualquier duda, la app elige lo que no pierde datos y no pregunta; la únic
 
 Una función está terminada solo cuando su prueba pasa sola, sin intervención humana. Un único comando (`npm run verificar`) corre todas las pruebas con reloj simulado y datos de ejemplo, y escribe REPORTE.md con el resultado de cada ID. Para poder simular el tiempo, el código recibe el reloj como dependencia.
 
-Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio O7-O12, tareas recurrentes O13-O19 y gráficos O20-O24; cada grupo se agrega antes de construirlo), P paridad con el Lean OS original y diseño (P1-P19, etapa 7).
+Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio O7-O12, tareas recurrentes O13-O19 y gráficos O20-O24; cada grupo se agrega antes de construirlo), P paridad con el Lean OS original y diseño (P1-P19, etapa 7) y repaso libre (P20-P22).
 
 | ID | Qué hace la prueba | Resultado esperado |
 | --- | --- | --- |
@@ -219,6 +221,9 @@ Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G se
 | P17 | Revisar íconos, foco y navegación en los tres anchos | Los íconos son SVG propios con `aria-hidden` y texto al lado (sin emojis ni fuentes de íconos), el foco se ve, la pantalla activa lleva `aria-current` y el Repaso en celular muestra solo chips, progreso, tarjeta y botones |
 | P18 | `npm run capturas` y revisar `docs/capturas/` | Existen PNG válidos de Áreas, Repaso (con la respuesta visible) y Detalle de área, a 390, 768 y 1440 px, en claro y oscuro (18 archivos o más), con nombre `<pantalla>-<ancho>-<tema>.png`; el revisor las miró y las aprobó (queda anotado en DECISIONES.md) |
 | P19 | Correr todo `npm run verificar` y la sincronización contra el servidor con datos de antes de la etapa 7 | Todos los IDs de antes siguen verdes sin cambios en sus criterios; el esquema no cambia (sin migraciones) y los datos viejos se ven igual en las pantallas nuevas |
+| P20 | Con las tarjetas de P1 (vencidas, que vencen mañana, nuevas por encima del tope y suspendidas), armar el repaso libre de todo, de un área y de una subárea | La cola trae todas las tarjetas activas del filtro (también las que vencen mañana y todas las nuevas, sin tope), sin suspendidas ni borradas; el área incluye sus subáreas y la subárea solo lo suyo; orden estable (vencidas primero, después por vencimiento); “Otra vez” reencola al final; un filtro vacío da una cola vacía |
+| P21 | Calificar con los cuatro botones en repaso libre y comparar antes y después; abrir una tarjeta en modo libre sin tocar “Ver respuesta” | Ninguna tarjeta cambia (ease, intervalo, reps, lapses, vence, marcas de tiempo), no se crean registros de repaso, las estadísticas, la racha, la retención y los contadores “para hoy” son idénticos, y no se agrega nada a la cola de sincronización; la respuesta no está en la página antes de “Ver respuesta” (R9) y los atajos 1 a 4 y Espacio funcionan; la cola normal del día (R7) queda intacta |
+| P22 | En Repaso, elegir “Repasar todo” con y sin filtro; terminar la sesión; salir del modo | Cada chip muestra cuántas tarjetas tiene en total; el modo libre dice claro que no cambia las fechas, muestra “Tarjeta N de M” sin intervalos en los botones, al terminar ofrece volver al repaso del día y “Salir del modo libre” vuelve a la cola normal con sus contadores; una vista de celular de 390 px mantiene la tarjeta y los botones sin scroll y controles de 44 px |
 
 ## 5. Arquitectura y tecnologías
 
