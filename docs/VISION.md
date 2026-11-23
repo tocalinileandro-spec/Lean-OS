@@ -34,21 +34,23 @@ Esta app existe para que lo que aprendés, lo que tenés que hacer y lo que se t
 
 ## 2. Módulos y funcionalidades
 
-Tres módulos, cinco pantallas: Hoy, Repaso, Tareas, Apuntes y Ajustes. Hoy junta lo pendiente de los tres módulos.
+Tres módulos y seis pantallas: Áreas (la de inicio), Repaso, Hoy, Tareas, Apuntes y Ajustes; la lista de Tarjetas (gestión) se abre desde Áreas. Hoy junta lo pendiente de los tres módulos.
 
 ### Módulo 1: Tarjetas con repetición espaciada
 
 **Organización.** Cada tarjeta pertenece a un Área > Subárea (por ejemplo Programación > CS50) y tiene pregunta, respuesta y una pista opcional.
 
-**Importar.** El botón “Importar” abre una caja donde se pega el bloque JSON. Al confirmar, la app muestra un informe: tarjetas creadas, duplicadas omitidas y errores. Este formato es un contrato y es el que genera Claude:
+**Importar.** El botón “Importar” abre una caja donde se pega el bloque JSON. Antes de guardar, “Revisar” muestra qué pasaría (área, tema, preguntas nuevas y duplicadas) sin crear nada; al confirmar, la app muestra un informe: tarjetas creadas, duplicadas omitidas y errores. La caja nunca muestra errores ni informes antes de pegar algo. Este formato es un contrato y es el que genera Claude:
 
 ```json
 {"tipo":"aprendizaje","fecha":"2026-11-22","area":"Programación > CS50","tema":"Funciones en Python","resumen":"Resumen de 2 a 4 líneas.","preguntas":[{"p":"¿Qué hace return?","r":"Devuelve un valor y termina la función.","pista":"Pensá en el código que sigue."}]}
 ```
 
-**Repasar.**
+**Áreas y temas.** La pantalla de inicio lista las áreas con sus subáreas, la cantidad de tarjetas, las que tocan hoy y una barra de dominio (tarjetas con intervalo de 21 días o más); permite crear áreas y entrar a cada una. Dentro de un área se crean subáreas y se ven sus temas (un tema es un bloque importado: su resumen y sus tarjetas); un tema se puede mover a otra área o subárea, y un tema, una subárea o un área se pueden borrar (papelera de 30 días, con restauración del conjunto). Dos niveles: Área > Subárea.
 
-1. La pantalla muestra la pregunta (y la pista, si se la pide).
+**Repasar.** Se puede repasar todo lo de hoy, un área (con sus subáreas) o una subárea, con chips que muestran cuántas tarjetas hay en cada una.
+
+1. La pantalla muestra la etiqueta “Área › Subárea · Tema”, la pregunta (y la pista, si se la pide) y un enlace “Ver el resumen del tema”.
 2. Tocás “Ver respuesta” (o Espacio).
 3. Aparecen cuatro botones con el próximo intervalo de cada uno: Otra vez, Difícil, Bien y Fácil (atajos 1 a 4).
 4. La app guarda al instante y pasa a la siguiente. Ctrl+Z deshace la última calificación.
@@ -93,7 +95,7 @@ Reglas del cálculo: reps suma 1 con Difícil, Bien y Fácil. El intervalo se re
 
 ### Ajustes
 
-Tarjetas nuevas por día (20), hora de cambio de día (04:00), estado de sincronización, exportar todo (JSON), importar un respaldo y cerrar sesión.
+Tarjetas nuevas por día (20), hora de cambio de día (04:00), tema (sistema, claro u oscuro; se guarda en el dispositivo), estado de sincronización, exportar todo (JSON), importar un respaldo, importar el respaldo del Lean OS original (el ZIP de su “Exportar todo” o sus archivos JSON, sin duplicar) y cerrar sesión.
 
 ## 3. Reglas de decisión
 
@@ -128,14 +130,14 @@ Ante cualquier duda, la app elige lo que no pierde datos y no pregunta; la únic
 - **Dudas que este documento no cubre.** El agente elige la opción más simple que no pierda datos, la anota en DECISIONES.md (fecha, qué eligió y por qué) y sigue sin preguntar.
 - **Idioma.** La interfaz está en español rioplatense (“Tocá”, “Elegí”). Las fechas se muestran como dd/mm/aaaa y se guardan en ISO (AAAA-MM-DD; los instantes, en UTC).
 - **Dependencias.** Las mínimas. Cada una nueva se justifica en una línea en DECISIONES.md y se prefiere la biblioteca estándar.
-- **Diseño.** Sobrio, una acción principal por pantalla, tema claro u oscuro según el sistema, usable con teclado en la PC y con el pulgar en el celular.
+- **Diseño.** Sobrio, una acción principal por pantalla, tema claro u oscuro según el sistema (o el que se elija en Ajustes), usable con teclado en la PC y con el pulgar en el celular. La referencia visual es `docs/maqueta/` (Inter, azul #2563eb, radio de 20 px, botones pastilla, sombras suaves); barra superior en PC y barra inferior en celular, objetivos táctiles de 44 px, contraste AA, sin animaciones con `prefers-reduced-motion` e íconos SVG propios. Todo sin recursos externos.
 - **Errores.** Mensajes en castellano que dicen qué pasó y qué hacer; nunca un error técnico crudo en pantalla.
 
 ## 4. Criterios de terminado verificables
 
 Una función está terminada solo cuando su prueba pasa sola, sin intervención humana. Un único comando (`npm run verificar`) corre todas las pruebas con reloj simulado y datos de ejemplo, y escribe REPORTE.md con el resultado de cada ID. Para poder simular el tiempo, el código recibe el reloj como dependencia.
 
-Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio O7-O12, tareas recurrentes O13-O19 y gráficos O20-O24; cada grupo se agrega antes de construirlo).
+Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G seguridad, B build y entrega, O opcionales (respaldo externo O1-O6, audio O7-O12, tareas recurrentes O13-O19 y gráficos O20-O24; cada grupo se agrega antes de construirlo), P paridad con el Lean OS original y diseño (P1-P19, etapa 7).
 
 | ID | Qué hace la prueba | Resultado esperado |
 | --- | --- | --- |
@@ -198,6 +200,25 @@ Prefijos: I importación, R repaso, T tareas, A apuntes, S sincronización, G se
 | O22 | Tarjetas por área y tareas hechas por semana (últimas 8 semanas) con datos de ejemplo | Las barras por área suman las subáreas en el Área (igual que las estadísticas mínimas) y las tareas hechas se cuentan en la semana (lunes a domingo, día lógico) en que se marcaron |
 | O23 | Abrir los gráficos con datos, sin datos, en tema claro y oscuro, y revisar la página | Se dibujan con SVG propio, sin librerías ni recursos externos (la política CSP no cambia), con rol de imagen, texto alternativo y los valores también como texto; sin datos muestran un estado vacío en castellano |
 | O24 | 20.000 repasos y 5.000 tarjetas: calcular todos los gráficos; y las estadísticas mínimas de antes | El cálculo tarda menos de 500 ms y las estadísticas mínimas (pendientes hoy, repasadas hoy, racha, total por área) dan el mismo resultado que antes |
+| P1 | Datos de ejemplo (3 áreas, una con 2 subáreas, 71 tarjetas, varias vencidas, nuevas y suspendidas), reloj simulado y pedir el resumen de áreas | Por área de primer nivel: subáreas, cantidad de tarjetas (suma las subáreas, sin borradas), “para hoy” (la misma cola del Repaso, con el tope de nuevas) y dominio en % (activas con intervalo de 21 días o más sobre activas; sin tarjetas, 0). La suma de “para hoy” de las áreas es igual al contador de “Todo lo de hoy” |
+| P2 | Abrir la app con datos y sin datos | La primera pantalla es Áreas: tarjetas de área con “N tarjetas · M subáreas”, “N para hoy” o “Al día”, barra de dominio con su valor en texto y botón “Repasar hoy · N” (oculto si N es 0); sin áreas muestra un estado vacío con “Crear área” e “Importar” |
+| P3 | Crear un área y una subárea desde la interfaz; crear “programacion” existiendo “Programación”; crear con nombre vacío o de más de 60 letras | Se crean y la subárea cuelga de su área; el repetido (sin importar tildes ni mayúsculas, como I6) no duplica y avisa en castellano; vacío y largo se rechazan con mensaje; nada se pierde |
+| P4 | Repaso con chips: elegir “Todo lo de hoy”, un área y una subárea (con las tarjetas de P1) | Cada chip muestra su contador; el área incluye a sus subáreas y la subárea solo lo suyo; la cola respeta el tope de nuevas (R7); el filtro se mantiene durante la sesión; sin pendientes en el filtro muestra un estado vacío con la fecha de lo próximo |
+| P5 | Abrir una tarjeta de una importación con subárea, otra sin subárea y una creada a mano; tocar “Ver el resumen del tema” | La etiqueta dice “Área › Subárea · Tema”, “Área · Tema” o “Área › Subárea”; los cuatro botones muestran el intervalo siguiente (R1 a R4 intactos); se ve “Tarjeta N de M”; el enlace abre el resumen y no revela la respuesta (R9 intacto); sin resumen el enlace no aparece |
+| P6 | Detalle de un área con dos subáreas y temas; mover un tema a otra subárea y a otra área; mover al mismo lugar | Se listan subáreas con sus temas (nombre, tarjetas y “N hoy”, “Al día” o “Nuevo”) y “Repasar esta área · N”; al mover, las tarjetas conservan su estado de repaso y el resumen y la importación se mueven con ellas; al mismo lugar avisa y no cambia nada; no se pierde ni se duplica ninguna tarjeta |
+| P7 | Borrar un tema, una subárea y un área con subáreas; ver la confirmación; restaurar; avanzar el reloj 30 días | La confirmación dice cuántas subáreas, temas y tarjetas se van; todo sale de Áreas, Repaso y estadísticas y queda en la papelera con el mismo instante de borrado; restaurar devuelve el conjunto con el estado de repaso intacto y sin resucitar lo que ya estaba borrado antes; a los 30 días se elimina, y los repasos se conservan |
+| P8 | Importar con revisión: pegar un bloque válido y tocar “Revisar”; confirmar; cancelar; repetir con un bloque cortado | “Revisar” muestra área › subárea, tema, preguntas nuevas y duplicadas y el resumen, sin crear nada; “Confirmar” da el mismo resultado que I1 a I3; “Cancelar” no crea nada y deja el texto; el JSON roto muestra su error al revisar, con el texto en la caja (I4, I5) |
+| P9 | Abrir la caja de importar sin pegar nada, después de una importación con errores y después de otra exitosa; tocar “Revisar” con la caja vacía | No hay errores, informes ni conteos visibles antes de pegar; “Revisar” vacío muestra un recordatorio amable en castellano y no crea nada |
+| P10 | Importar el respaldo del original: un ZIP generado por el `Exportar todo` del prototipo (áreas con subáreas, temas, preguntas con nivel y fecha), un archivo de área suelto y `prototipo/ejemplos/aprendizaje_ejemplo.json` | Se crean áreas y subáreas (los niveles 3 o más se aplanan en el nombre de la subárea y se avisa), una importación y un apunte de aprendizaje por tema y las tarjetas con su pista; el estado se traduce (nivel 0: nueva, vence en `proxima`; nivel n de 1 a 5: intervalo de [1, 3, 7, 21, 60], reps n, ease 2,5, vence `proxima`); el ejemplo da 3 tarjetas en CS50; informe en castellano con áreas, temas, tarjetas creadas y duplicadas |
+| P11 | Importar el mismo respaldo dos veces; con una tarjeta ya existente y calificada; con un archivo dañado y con uno que no es del original | La segunda vez crea 0 y todas son duplicadas; la tarjeta existente conserva su estado; el archivo dañado o ajeno da un mensaje en castellano y no cambia nada (todo o nada por archivo); `importados.json` y los respaldos del original se ignoran |
+| P12 | Revisar el CSS y el HTML publicados | Hay variables CSS para color, radio (20 px), sombras, tipografía (Inter incluida en la app) y espaciado, en claro y oscuro; los botones son pastilla; no hay recursos externos ni atributos `style` en línea; la CSP solo suma `font-src 'self'` |
+| P13 | Calcular el contraste de los pares texto/fondo de los tokens (texto, texto suave, acento, texto sobre acento, etiquetas de las cuatro calificaciones, insignias) en claro y oscuro | Todos cumplen AA: 4,5:1 o más para texto normal y 3:1 o más para texto grande y bordes de componentes |
+| P14 | Cambiar el tema en Ajustes entre Sistema, Claro y Oscuro, recargar y simular el esquema de colores del sistema | Por defecto sigue al sistema (igual que hoy); la elección se guarda en el dispositivo, se aplica al abrir y no cambia datos, sincronización ni pruebas anteriores |
+| P15 | Prueba de `verificar` sobre el CSS y el DOM (media query de 640 px, tamaños mínimos de 44 px de los controles, barras de navegación) y, de forma real, `npm run capturas` con Playwright a 390, 768 y 1440 px en claro y oscuro, que mide cada control y deja el resultado en `docs/capturas/medicion.json` (la prueba de `verificar` lo lee y exige cero incumplimientos) | A 640 px o menos hay barra inferior con Hoy, Repaso, Áreas, Tareas y Apuntes (Ajustes y Tarjetas se alcanzan desde la cabecera y Áreas); desde 641 px, barra superior; todo control interactivo mide 44 × 44 px o más en 390 px; no hay scroll horizontal en ningún ancho |
+| P16 | Revisar las transiciones y animaciones del CSS con `prefers-reduced-motion: reduce` | Con la preferencia activa no hay transiciones ni animaciones; sin ella, solo transiciones suaves de 200 ms o menos |
+| P17 | Revisar íconos, foco y navegación en los tres anchos | Los íconos son SVG propios con `aria-hidden` y texto al lado (sin emojis ni fuentes de íconos), el foco se ve, la pantalla activa lleva `aria-current` y el Repaso en celular muestra solo chips, progreso, tarjeta y botones |
+| P18 | `npm run capturas` y revisar `docs/capturas/` | Existen PNG válidos de Áreas, Repaso (con la respuesta visible) y Detalle de área, a 390, 768 y 1440 px, en claro y oscuro (18 archivos o más), con nombre `<pantalla>-<ancho>-<tema>.png`; el revisor las miró y las aprobó (queda anotado en DECISIONES.md) |
+| P19 | Correr todo `npm run verificar` y la sincronización contra el servidor con datos de antes de la etapa 7 | Todos los IDs de antes siguen verdes sin cambios en sus criterios; el esquema no cambia (sin migraciones) y los datos viejos se ven igual en las pantallas nuevas |
 
 ## 5. Arquitectura y tecnologías
 
@@ -292,6 +313,8 @@ Cuatro fases esenciales en orden y una quinta opcional (la app de Windows). Cada
 5. **App de Windows (opcional).** Solo si la PWA instalable no alcanza: empaqueta la misma app en un .exe y lo compila en GitHub Actions. Termina cuando: B2 y S1 dentro del .exe.
 
 **Opcionales**, solo con las cuatro fases esenciales en verde y en este orden: respaldo externo fuera del volumen, entrada por audio, tareas recurrentes y gráficos de estadísticas. Cada una agrega primero sus criterios de terminado a la sección 4 (y su clave a la sección 7, si necesita una).
+
+**Etapa 7 (pedida el 2026-11-23, después de las fases y opcionales):** paridad funcional con el Lean OS original y diseño profesional según `docs/maqueta/`. Cada tarea chica agrega o cumple IDs P1-P19; la lista de tareas está en ESTADO.md. No cambia el esquema de datos ni la sincronización.
 
 **Cómo se avanza**
 

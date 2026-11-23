@@ -289,3 +289,48 @@ Formato: fecha, qué se eligió, por qué.
 - **Reglas:** usa `purgarPapelera` tal cual (solo `deleted_at` de 30 días o más, inclusive; nunca sin `deleted_at`; los repasos no se tocan). Usa el almacén decorado, cuyo `eliminarDefinitivo` no anota en la cola: la purga sigue siendo local (decisión F4-c). Se corre antes del primer pull; si una resincronización completa trae de vuelta un registro viejo, la purga del día siguiente lo elimina de nuevo.
 - **Fallos:** todo va en try/catch dentro de `crearPurgaDiaria`; si falla, no se marca el día como hecho (se reintenta en el chequeo siguiente) y el arranque continúa.
 - **Pruebas:** `pruebas/purga-cliente.test.ts` (sin ID, reloj simulado).
+
+## 2026-11-23 (etapa 7: auditoría prototipo vs app nueva)
+
+**Pedido del dueño:** paridad funcional con el Lean OS original (`prototipo/`, Python) y diseño profesional según `docs/maqueta/`. Cambio a `docs/VISION.md` (motivo: pedido expreso del dueño): módulo 1 gana "Áreas y temas", "Importar con revisión" y la migración; Ajustes gana "Importar respaldo del Lean OS original" y "Tema"; la sección 4 gana el prefijo P; la sección 8 gana la etapa 7. La maqueta estaba en `maqueta/` y se movió a `docs/maqueta/` (con `git mv`, sin tocar su contenido).
+
+**Qué ya está en paridad (no se toca):** importar JSON con cercas de código y deduplicación, subáreas con ` > `, repaso por vencimiento con pista a pedido, resumen del tema guardado, papelera, exportación, respaldos.
+
+**Diferencias (D) y cómo se cierran:**
+
+| # | Original | App nueva | Cierre |
+| --- | --- | --- | --- |
+| D1 | Inicio = "Tus áreas": tarjetas con subáreas, temas, preguntas y pendientes; "Repasar hoy · N" | Inicio = Hoy; no hay pantalla de áreas | P1, P2 |
+| D2 | Crear área vacía y subárea desde la pantalla | Solo nacen al importar | P3 |
+| D3 | Detalle de área: camino, subáreas, temas con resumen y preguntas, mover tema, eliminar tema y área con confirmación | No existe | P6, P7 |
+| D4 | Repaso: selector "Todo lo de hoy" + áreas con contador; "Área · Tema"; "Ver el resumen del tema"; vacío con próxima fecha | Repaso general; solo el área; sin resumen; vacío sin fecha | P4, P5 |
+| D5 | Importar con "Revisar" (vista previa, aviso de ya importado, lista de tus áreas) y luego "Confirmar" | Confirma directo e informa después; la caja muestra el informe/errores anteriores antes de pegar nada (defecto a corregir) | P8, P9 |
+| D6 | Eliminar tema/área copia a `papelera/` (sin restaurar desde la pantalla) | Papelera de 30 días con restaurar, pero solo tarjetas, tareas, metas y apuntes | P7 (cascada con restauración) |
+| D7 | Anidado sin límite (`A > B > C`) | Dos niveles (Área > Subárea), regla de la visión | Se mantiene; la migración aplana los niveles 3+ en el nombre de la subárea (`B › C`) y se avisa en el informe |
+| D8 | Progreso por nivel 0 a 5 con intervalos 1, 3, 7, 21, 60 días; "me acordé" sí/no | SM-2 de 4 botones con intervalo siguiente (sección 2) | Se mantiene SM-2; la migración convierte nivel y `proxima` (P10) |
+| D9 | "Exportar todo" = **ZIP** con `areas/*.json` e `importados.json` (no un JSON único) | Exporta un JSON propio; no lee el del original | P10, P11: se leen el ZIP real (lo que el original produce) y también los JSON sueltos |
+| D10 | Estilos propios con Inter local | Estilos sobrios; `Inter` nombrada sin cargarse; sin sistema de diseño | P12-P17 con `docs/maqueta/` como referencia |
+| D11 | Barra con Áreas / Repaso (insignia) / Importar | Seis botones iguales | P15 (barra superior en PC, inferior en celular) |
+| D12 | Un tema es un bloque importado (con id, fecha, resumen y preguntas) | La tarjeta no guarda el tema; el tema vive en la importación (`importaciones.tema`) y su resumen en el apunte ligado | Sin cambio de esquema: tema = importación + su apunte + sus tarjetas |
+
+**Solo en la app nueva (no se debe perder):** tareas, metas, apuntes, sincronización, servidor, app de Windows, opcionales O1-O24.
+
+**Decisiones de diseño de la etapa 7 (opción más simple que no pierde datos):**
+
+- **Sin cambio de esquema.** Todo se resuelve con los campos que ya existen (`areas.padre_id`, `importaciones`, `apuntes.tema`). Sin migraciones: P19.
+- **"Para hoy" por área = las tarjetas de la cola del día** (mismo cálculo que el Repaso, con el límite de nuevas), así los contadores de los chips suman "Todo lo de hoy".
+- **"Dominadas" (barra de la maqueta) = tarjetas activas con intervalo de 21 días o más**, sobre las activas (no borradas ni suspendidas). Es solo informativo.
+- **Borrar en cascada con un mismo instante** (`deleted_at` idéntico en área, subáreas, importaciones, apuntes y tarjetas del conjunto): sirve para restaurar el conjunto exacto sin resucitar lo que ya estaba borrado antes. La purga a 30 días y la sincronización no cambian.
+- **Tarjetas sueltas** (creadas a mano, sin importación) se muestran en el área bajo "Tarjetas sueltas"; se gestionan como hoy desde Tarjetas.
+- **Fuente Inter propia:** el archivo `Inter.woff2` ya está en el repo (`prototipo/web/static/fuentes/`, con su licencia). Se copia a la app; la CSP suma solo `font-src 'self'` (ningún servicio externo; la maqueta usa Google Fonts, que no se copia por la regla de no enviar datos a terceros).
+- **Modo oscuro opcional:** por defecto sigue al sistema (como hoy); Ajustes permite fijar Claro u Oscuro, guardado en el dispositivo (sin sincronizar).
+- **Capturas:** las genera `npm run capturas` con el Playwright ya instalado en este entorno (no se agrega como dependencia del proyecto ni corre dentro de `verificar`); una prueba de `verificar` comprueba que los archivos existen (P18).
+- **Rama:** las tareas van en `tarea/<id>` por pedido del dueño de mantener el flujo de pull request.
+
+## 2026-11-23 (B3: la prueba estática ya no exige `scheduled_snapshots`)
+
+El dueño quitó `scheduled_snapshots = true` de `fly.toml` (commit 699ae7a) porque Fly rechazó la clave al desplegar; era la clave "escrita de memoria" que ESTADO.md marcaba como dudosa. La prueba B3 seguía exigiéndola y `main` quedó en rojo. Se quita solo esa aserción (el resto de B3 queda igual: HTTPS, puerto, `/health`, volumen en `/data`, Dockerfile y workflow) y se agrega una que confirma que la clave rechazada no vuelve. No es un cambio del criterio B3 de la sección 4: sigue siendo "desplegar y consultar /health".
+
+## 2026-11-23 (p-docs, ciclo 2: P15 y P18 medibles)
+
+El revisor señaló dos incoherencias de los criterios nuevos. P18 pedía 36 archivos pero son 3 pantallas × 3 anchos × 2 temas = 18: se corrige a 18 o más. P15 pedía Playwright dentro de `verificar`, que no lo corre: ahora se mide en dos capas. `verificar` comprueba CSS y DOM (media query, tamaños mínimos, barras) y lee `docs/capturas/medicion.json`; `npm run capturas` hace la medición real con Playwright y escribe ese archivo, fallando si hay un control menor a 44 px.
