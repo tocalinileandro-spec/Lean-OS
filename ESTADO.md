@@ -1,29 +1,39 @@
 # Estado
 
-**EN CURSO** (reabierto el 2026-11-23 por pedido del dueño). Etapa 7: paridad funcional con el Lean OS original (`prototipo/`) + diseño profesional según `docs/maqueta/`. Lo anterior (fases 1 a 5 y opcionales) sigue completo y en `main`.
+**COMPLETO** (2026-11-23). Etapa 7 terminada: paridad funcional con el Lean OS original (`prototipo/`) y diseño profesional según `docs/maqueta/`, todo en `main` con CI verde. Para dejarlo en producción solo falta lo de siempre: cargar los secretos y desplegar (ver "Qué tenés que hacer vos" más abajo).
 
 ## Control de sesión (presupuesto de 20 h)
 
-- **Sesión activa:** desde 2026-11-23 02:24 UTC (Director). Marca de actividad: 2026-11-23 02:24 UTC.
-- **Total acumulado antes de esta sesión:** 1,9 h de 20 h.
-- **Inicio de esta sesión:** 2026-11-23 02:24:04 UTC. Al cerrar se suma lo trabajado.
+- **Sesión activa:** ninguna. Cerrada el 2026-11-23 04:40 UTC.
+- **Esta sesión:** inicio 2026-11-23 02:24:04 UTC, cierre 04:40 UTC, unas 2,3 h.
+- **Total acumulado:** 4,2 h de 20 h (1,9 h de antes + 2,3 h).
+- Si otra sesión lee esto: dice COMPLETO, no hay nada que hacer.
 
-## Etapa 7: plan y avance
+## Etapa 7: qué quedó hecho
 
-Criterios nuevos: prefijo P en la sección 4 de `docs/VISION.md`. Auditoría y decisiones: `DECISIONES.md` ("Auditoría prototipo vs app nueva").
-
-| Tarea | Qué entrega | IDs | Estado |
+| Tarea | Qué entregó | IDs | PR |
 | --- | --- | --- | --- |
-| p-docs | Maqueta a `docs/maqueta`, auditoría, criterios P, ESTADO | (docs) | en curso |
-| p-logica | Lógica pura: resumen de áreas, temas, mover, borrar/restaurar en cascada, crear área/subárea | P1, P3, P6, P7 | pendiente |
-| p-migracion | Leer el respaldo del Lean OS original (ZIP y JSON), sin duplicar | P10, P11 | pendiente |
-| p-diseno-base | Tokens CSS, Inter local, barra superior/inferior, tema oscuro opcional, movimiento reducido | P12-P17 | pendiente |
-| p-pantallas | Áreas (inicio), detalle de área, repaso con chips y etiqueta, importar con revisión, Ajustes | P2, P4, P5, P8, P9 | pendiente |
-| p-rediseno | Hoy, Tareas, Apuntes, Tarjetas y Ajustes con el sistema de diseño | P12-P17 | pendiente |
-| p-capturas | `npm run capturas`, capturas en `docs/capturas/`, revisión visual | P18 | pendiente |
-| p-cierre | Todo verde, ESTADO, listo para desplegar | P19 | pendiente |
+| p-docs | Maqueta a `docs/maqueta/`, auditoría, criterios P1-P19, arreglo de la prueba B3 (Fly rechazó `scheduled_snapshots`) | (docs) | #15 |
+| p-logica | Resumen de áreas, crear área/subárea, detalle, mover tema, borrar y restaurar en cascada, papelera con temas y áreas | P1, P3, P6, P7 | #16 |
+| p-migracion | Lector ZIP propio + importar el respaldo del Lean OS original (ZIP real, JSON de área, bloques "aprendizaje") sin duplicar | P10, P11 | #17 |
+| p-diseno-base | Tokens CSS, Inter propia, barra superior/inferior, tema Sistema/Claro/Oscuro, movimiento reducido, contraste AA | P12, P13, P14, P16 | #18 |
+| p-areas-ui | Pantalla Áreas (inicio), detalle de área, mover y borrar con confirmación y Deshacer | P2 (+ UI de P3, P6, P7) | #19 |
+| p-repaso-importar | Repaso con chips y etiqueta "Área › Subárea · Tema", resumen del tema, importar con revisión, caja limpia, migración en Ajustes | P4, P5, P8, P9 | #20 |
+| p-rediseno | Hoy, Tareas, Apuntes, Tarjetas y Ajustes con el sistema de diseño | P15, P17 | #21 |
+| p-capturas | `npm run capturas`, 18 capturas en `docs/capturas/`, medición real (`medicion.json`) | P15, P18 | #22 |
+| p-cierre | Prueba de no regresión, README y PROBAR | P19 | (este) |
 
-Próximo paso exacto: terminar `p-docs` (PR, CI verde, fusionar) y lanzar `p-logica`.
+- **Pruebas:** `npm run verificar` da APROBADO con todos los IDs en verde (I, R, T, A, S, G, B, O y P1-P19). Ningún criterio de la sección 4 se cambió ni relajó. Un solo cambio de prueba previo: B3 (ver DECISIONES.md).
+- **Ciclos:** el máximo fue el ciclo 2 en cada tarea (tope: 3, o 5 para diseño). Sin bloqueos.
+- **Cómo se ve:** `docs/capturas/` (Áreas, Repaso con la respuesta visible y Detalle de área; 390, 768 y 1440 px; claro y oscuro). El revisor las miró una por una y las aprobó (DECISIONES.md, "P18: aprobación visual").
+- **Migración:** en Ajustes, "Importar respaldo del Lean OS original". Nota: el "Exportar todo" del original produce un ZIP (no un JSON); la app lee ese ZIP, los JSON de área sueltos y los bloques "aprendizaje".
+
+## Pendientes opcionales (no bloquean)
+
+- El título derivado de un apunte sin título muestra marcas de markdown crudas (`**`, `#`), lógica previa de `tituloApunte`.
+- "0 subáreas" en áreas sin subáreas podría decir "Sin subáreas".
+- El medidor de 44 px no ejercita diálogos abiertos y mide Tareas y Apuntes sin datos.
+- Las capturas no se regeneran solas: tras cambiar estilos, correr `npm run build && npm run capturas` y commitear.
 
 # Historial hasta el cierre anterior (2026-11-22)
 
