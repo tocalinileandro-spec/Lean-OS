@@ -1,6 +1,6 @@
 # Estado
 
-**COMPLETO** (2026-11-23). Después de la etapa 7 se agregó el **repaso libre** (P20-P22, pedido del dueño): "Repasar todo" en Repaso, práctica sobre todas las tarjetas del filtro sin cambiar el calendario. PR #24.
+**COMPLETO** (2026-11-23). Después de la etapa 7 se agregó el **repaso libre** (P20-P22, pedido del dueño): "Repasar todo" en Repaso, práctica sobre todas las tarjetas del filtro sin cambiar el calendario. PR #24. Luego, a pedido del dueño, **QA de celular** (P23, `npm run movil`): zona segura de iPhone, apaisado, zoom de iOS en campos y más (ver DECISIONES.md "p-movil-qa").
 
 Etapa 7 (2026-11-23). Etapa 7 terminada: paridad funcional con el Lean OS original (`prototipo/`) y diseño profesional según `docs/maqueta/`, todo en `main` con CI verde. Para dejarlo en producción solo falta lo de siempre: cargar los secretos y desplegar (ver "Qué tenés que hacer vos" más abajo).
 
@@ -8,7 +8,7 @@ Etapa 7 (2026-11-23). Etapa 7 terminada: paridad funcional con el Lean OS origin
 
 - **Sesión activa:** ninguna. Cerrada el 2026-11-23 04:40 UTC.
 - **Esta sesión:** inicio 2026-11-23 02:24:04 UTC, cierre 04:40 UTC, unas 2,3 h.
-- **Total acumulado:** unas 4,6 h de 20 h (1,9 h de antes + 2,3 h de la etapa 7 + 0,4 h del repaso libre).
+- **Total acumulado:** unas 5,3 h de 20 h (1,9 h de antes + 2,3 h de la etapa 7 + 0,4 h del repaso libre + 0,7 h de QA de celular).
 - Si otra sesión lee esto: dice COMPLETO, no hay nada que hacer.
 
 ## Etapa 7: qué quedó hecho
@@ -35,6 +35,7 @@ Etapa 7 (2026-11-23). Etapa 7 terminada: paridad funcional con el Lean OS origin
 - El título derivado de un apunte sin título muestra marcas de markdown crudas (`**`, `#`), lógica previa de `tituloApunte`.
 - "0 subáreas" en áreas sin subáreas podría decir "Sin subáreas".
 - El medidor de 44 px no ejercita diálogos abiertos y mide Tareas y Apuntes sin datos.
+- Para revisar el celular: `npm run build && npm run movil` (tarda unos 10 minutos, 12 dispositivos); `MOVIL_SOLO="390x844:vertical:claro"` corre una sola combinación.
 - Las capturas no se regeneran solas: tras cambiar estilos, correr `npm run build && npm run capturas` y commitear.
 
 # Historial hasta el cierre anterior (2026-11-22)

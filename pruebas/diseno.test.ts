@@ -434,8 +434,8 @@ describe("P15 (CSS) y P17 (DOM): navegación, tamaños táctiles e íconos", () 
     expect(nav.decl.get("grid-template-columns")).toBe("repeat(5, minmax(0, 1fr))");
     expect(nav.decl.get("padding")).toContain("env(safe-area-inset-bottom)");
     // El contenido no queda tapado por la barra inferior.
-    expect(regla("main", "(max-width: 640px)")[0]!.decl.get("padding")).toContain("env(safe-area-inset-bottom)");
-    expect(regla("main", "(max-width: 640px)")[0]!.decl.get("padding")).toContain("var(--alto-nav-movil)");
+    expect(regla("main", "(max-width: 640px)")[0]!.decl.get("padding-bottom")).toContain("env(safe-area-inset-bottom)");
+    expect(regla("main", "(max-width: 640px)")[0]!.decl.get("padding-bottom")).toContain("var(--alto-nav-movil)");
     // En escritorio el <nav> no es fijo.
     expect(regla(".nav")[0]!.decl.get("position")).toBeUndefined();
     // Los botones de calificación pasan de 4 a 2 columnas en el celular.

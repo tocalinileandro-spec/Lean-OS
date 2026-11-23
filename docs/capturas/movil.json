@@ -1,0 +1,113 @@
+{
+  "generado": "2026-11-23",
+  "dispositivos": [
+    {
+      "nombre": "320x568",
+      "ancho": 320,
+      "alto": 568,
+      "escala": 2,
+      "origen": "tamano"
+    },
+    {
+      "nombre": "360x640",
+      "ancho": 360,
+      "alto": 640,
+      "escala": 3,
+      "origen": "tamano"
+    },
+    {
+      "nombre": "375x667",
+      "ancho": 375,
+      "alto": 667,
+      "escala": 2,
+      "origen": "tamano"
+    },
+    {
+      "nombre": "390x844",
+      "ancho": 390,
+      "alto": 844,
+      "escala": 3,
+      "origen": "tamano"
+    },
+    {
+      "nombre": "412x915",
+      "ancho": 412,
+      "alto": 915,
+      "escala": 2,
+      "origen": "tamano"
+    },
+    {
+      "nombre": "430x932",
+      "ancho": 430,
+      "alto": 932,
+      "escala": 3,
+      "origen": "tamano"
+    },
+    {
+      "nombre": "iPhone SE",
+      "ancho": 320,
+      "alto": 568,
+      "escala": 2,
+      "origen": "playwright"
+    },
+    {
+      "nombre": "iPhone 13",
+      "ancho": 390,
+      "alto": 664,
+      "escala": 3,
+      "origen": "playwright"
+    },
+    {
+      "nombre": "iPhone 14",
+      "ancho": 390,
+      "alto": 664,
+      "escala": 3,
+      "origen": "playwright"
+    },
+    {
+      "nombre": "Pixel 5",
+      "ancho": 393,
+      "alto": 727,
+      "escala": 2.75,
+      "origen": "playwright"
+    },
+    {
+      "nombre": "Pixel 7",
+      "ancho": 412,
+      "alto": 839,
+      "escala": 2.625,
+      "origen": "playwright"
+    },
+    {
+      "nombre": "Galaxy S9+",
+      "ancho": 320,
+      "alto": 658,
+      "escala": 4.5,
+      "origen": "playwright"
+    }
+  ],
+  "orientaciones": [
+    "vertical",
+    "apaisado"
+  ],
+  "temas": [
+    "claro",
+    "oscuro"
+  ],
+  "pantallas": [
+    "hoy",
+    "repaso",
+    "areas",
+    "area",
+    "tareas",
+    "apuntes",
+    "tarjetas",
+    "ajustes"
+  ],
+  "estados": 61,
+  "problemas": [],
+  "resumen": {
+    "mediciones": 4752,
+    "problemas": 0
+  }
+}
