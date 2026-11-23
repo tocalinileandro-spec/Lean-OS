@@ -4,6 +4,8 @@
  * así se puede montar en un DOM simulado.
  */
 import { deshacerUltimaImportacion, importar, type InformeImportacion } from "../../compartido/importacion/importar.ts";
+import { revisarImportacion, type BloqueRevisado, type RevisionImportacion } from "../../compartido/importacion/revision.ts";
+import { importarRespaldoOriginal, type ArchivoAImportar, type InformeMigracion } from "../../compartido/migracion-original.ts";
 import {
   borrarApunte, borrarTarjeta, crearTarjeta, editarTarjeta, moverTarjetaDeArea, reanudarTarjeta, suspenderTarjeta,
 } from "../../compartido/gestion.ts";
@@ -15,8 +17,8 @@ import {
   detenerRepeticion, editarTarea, marcarHecha,
 } from "../../compartido/tareas.ts";
 import {
-  borrarArea, borrarSubarea, borrarTema, crearArea, detalleArea, moverTema, resumenAreas, resumenDeBorrado, restaurarArea, restaurarTema,
-  type GrupoDeTemas, type TemaDeArea,
+  borrarArea, borrarSubarea, borrarTema, contadoresDeRepaso, crearArea, detalleArea, moverTema, resumenAreas, resumenDeBorrado, restaurarArea, restaurarTema,
+  type ContadoresDeRepaso, type GrupoDeTemas, type TemaDeArea,
 } from "../../compartido/areas.ts";
 import { diaLogico } from "../../compartido/dia.ts";
 import type { ControlSync } from "../sync/motor.ts";
@@ -24,7 +26,7 @@ import { describirRepeticion, reglaValida, type Repeticion } from "../../compart
 import { TIPOS_APUNTE, type Apunte, type Calificacion, type EstadoMeta, type Id, type Tarea, type Tarjeta, type TipoApunte, type Trimestre } from "../../compartido/esquema.ts";
 import {
   agruparTarjetas, aplicarTema, cargarAjustes, cargarTema, cantidadParaRepasar, fechaLarga, formatearFecha, guardarAjustes, guardarTema, mensajeDeError, nombreDeArea,
-  opcionesDeArea, PantallaRepaso, TEMAS, validarAjustes, vistaHoy, type Tema, type Dependencias, type VistaRepaso,
+  lineasDeMigracion, opcionesDeArea, PantallaRepaso, TEMAS, validarAjustes, vistaHoy, type Tema, type Dependencias, type VistaRepaso,
 } from "./logica.ts";
 import {
   ESTADOS_META, etiquetaMeta, itemsPapelera, nombreTipoPapelera, restaurarItem, separarEtiquetas, textoProgreso,
@@ -46,7 +48,7 @@ const PESTANAS: { id: Pantalla; titulo: string; icono: NombreIcono }[] = [
 ];
 const TIPOS_NOMBRE: Record<TipoApunte, string> = { idea: "Idea", apunte: "Apunte", aprendizaje: "Aprendizaje" };
 /** Campos que conservan el foco al redibujar (se está escribiendo en ellos). */
-const CAMPOS_CON_FOCO = ["busqueda", "busqueda-apuntes", "tarea-rapida", "ver-estadisticas"];
+const CAMPOS_CON_FOCO = ["busqueda", "busqueda-apuntes", "tarea-rapida", "ver-estadisticas", "caja-importar"];
 /** Cantidad de colores de la paleta cíclica de las áreas (clases `.area-c0` a `.area-c5` en el CSS). */
 const COLORES_DE_AREA = 6;
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
@@ -86,6 +88,13 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   let importAbierto = false;
   let textoImport = "";
   let informe: InformeImportacion | null = null;
+  /** Vista previa de "Revisar" (nada se crea hasta "Confirmar importación") y recordatorio de caja vacía. */
+  let revision: RevisionImportacion | null = null;
+  let recordatorioImport = "";
+  /** Resumen del tema abierto desde el Repaso (solo lectura; no toca la sesión). */
+  let resumenRepaso: { tema: string; etiqueta: string; texto: string } | null = null;
+  /** Informe de la última importación del respaldo del Lean OS original (Ajustes). */
+  let informeMigracion: InformeMigracion | null = null;
   let papelera = false;
   // Áreas: área abierta (detalle), menú de tema, resumen, mover, confirmación de borrado y "Deshacer".
   let areaAbierta: Id | null = null;
@@ -160,6 +169,13 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   /** Cierra menús, formularios y avisos propios de Áreas (al cambiar de pantalla o de área). */
   function limpiarAreas(): void {
     areaAbierta = null; menuTema = null; resumenAbierto = null; moviendo = null; confirmando = null; deshacerBorrado = null; mensajeLocal = null;
+    resumenRepaso = null; informeMigracion = null;
+    limpiarResultadosImportar();
+  }
+
+  /** La caja de importar nunca arrastra errores, informes ni conteos de una vez anterior (P9). Lo pegado se conserva. */
+  function limpiarResultadosImportar(): void {
+    informe = null; revision = null; recordatorioImport = "";
   }
 
   function ir(p: Pantalla): void {
@@ -188,7 +204,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
 
   /** Abre Tarjetas con la caja de importar. */
   function abrirImportar(): void {
-    accion(() => { pantalla = "tarjetas"; repaso = null; limpiarAreas(); importAbierto = true; });
+    accion(() => { pantalla = "tarjetas"; repaso = null; limpiarAreas(); importAbierto = true; textoImport = ""; });
   }
 
   // ---------- estructura ----------
@@ -278,6 +294,11 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     }
     principal.replaceChildren(...contenido.filter((x): x is Node => !!x));
     dibujarDetalleSync();
+    // En el celular las filas de chips se deslizan: el chip elegido queda a la vista.
+    for (const fila of principal.querySelectorAll<HTMLElement>(".chips-fila")) {
+      const elegido = fila.querySelector<HTMLElement>('[aria-pressed="true"]');
+      if (elegido) fila.scrollLeft = Math.max(0, elegido.offsetLeft - (fila.clientWidth - elegido.offsetWidth) / 2);
+    }
     // Si se estaba escribiendo en un campo (búsqueda), se conserva el foco; si no, va a la acción principal.
     const mismo = idActivo ? principal.querySelector<HTMLInputElement>(`[id="${idActivo}"]`) : null;
     const pedido = focoEn ? principal.querySelector<HTMLElement>(`[id="${focoEn}"]`) : null;
@@ -622,37 +643,98 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
   }
 
   // ---------- Repaso ----------
+  /** Arranca una sesión nueva con ese filtro (null = todo lo de hoy). */
+  function elegirFiltroRepaso(areaId: Id | null): void {
+    accion(async () => { resumenRepaso = null; repaso = await PantallaRepaso.iniciar(d, { areaId }); });
+  }
+
+  /** Un chip del selector: texto + contador, `aria-pressed` si es el elegido. */
+  function chip(id: string, texto: string, n: number, elegido: boolean, onclick: () => void, clase = ""): Node {
+    return h("button", { type: "button", class: `chip ${clase}`.trim(), id, "aria-pressed": elegido ? "true" : "false", onclick: () => onclick() },
+      texto, " ", h("span", { class: "chip-n" }, String(n)));
+  }
+
+  /** "Qué repasar": Todo lo de hoy + una por área; con un área elegida, segunda fila con "Toda el área" y sus subáreas. */
+  function selectorRepaso(c: ContadoresDeRepaso, filtro: Id | null): Node {
+    const raizElegida = filtro ? c.areas.find((a) => a.id === filtro || a.subareas.some((s) => s.id === filtro)) : undefined;
+    const filas: Node[] = [
+      h("div", { class: "chips chips-fila", role: "group", "aria-label": "Qué repasar" },
+        chip("r-chip-todo", "Todo lo de hoy", c.todo, !raizElegida, () => elegirFiltroRepaso(null)),
+        ...c.areas.map((a) => chip(`r-chip-${a.id}`, a.nombre, a.paraHoy, raizElegida?.id === a.id, () => elegirFiltroRepaso(a.id)))),
+    ];
+    if (raizElegida && raizElegida.subareas.length > 0) {
+      filas.push(h("div", { class: "chips chips-fila chips-sub", role: "group", "aria-label": "Subárea" },
+        h("span", { class: "chips-etiqueta", "aria-hidden": "true" }, "Subárea"),
+        chip(`r-chip-todo-${raizElegida.id}`, "Toda el área", raizElegida.paraHoy, filtro === raizElegida.id, () => elegirFiltroRepaso(raizElegida.id), "chico"),
+        ...raizElegida.subareas.map((s) => chip(`r-chip-${s.id}`, s.nombre, s.paraHoy, filtro === s.id, () => elegirFiltroRepaso(s.id), "chico"))));
+    }
+    return h("div", { class: "repaso-selector" }, ...filas);
+  }
+
+  /** Panel del resumen del tema: diálogo con foco, se cierra con Escape, con el botón o tocando afuera. No muestra respuestas. */
+  function dialogoResumen(r: { tema: string; etiqueta: string; texto: string }): Node {
+    const cerrar = () => accion(() => { resumenRepaso = null; focoEn = "r-ver-resumen"; });
+    return h("div", { class: "resumen-fondo", id: "r-resumen-fondo", onclick: (ev: Event) => { if (ev.target === ev.currentTarget) cerrar(); } },
+      h("div", { class: "resumen-dialogo", id: "r-resumen", role: "dialog", "aria-modal": "true", "aria-labelledby": "r-resumen-titulo", tabindex: "-1" },
+        h("p", { class: "resumen-contexto" }, r.etiqueta),
+        h("h2", { id: "r-resumen-titulo" }, r.tema ? `Resumen de ${r.tema}` : "Resumen del tema"),
+        h("div", { class: "resumen-cuerpo", tabindex: "0", role: "region", "aria-labelledby": "r-resumen-titulo" }, renderizarMarkdown(doc, r.texto)),
+        boton("Cerrar", cerrar, "principal", { id: "r-resumen-cerrar" })));
+  }
+
   async function dibujarRepaso(): Promise<Node> {
     if (!repaso) repaso = await PantallaRepaso.iniciar(d);
     const v: VistaRepaso = await repaso.vista();
+    const aj = cargarAjustes(d.persistencia);
+    const selector = selectorRepaso(await contadoresDeRepaso(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia }), v.areaId);
     const deshacer = v.puedeDeshacer && boton("Deshacer (Ctrl+Z)", () => accion(() => repaso!.deshacer()), "suave chico");
     if (!v.hayTarjeta) {
-      return h("section", { class: "vacio" },
-        h("h1", {}, "Repaso"),
-        h("p", {}, v.calificadas > 0 ? `Listo: repasaste ${v.calificadas} ${v.calificadas === 1 ? "tarjeta" : "tarjetas"}.` : "No hay tarjetas para repasar ahora."),
-        boton("Volver a Hoy", () => ir("hoy"), "principal grande", { "data-foco": "1" }),
-        deshacer);
+      const donde = v.areaId ? (v.areaId && (await d.almacen.areas.obtener(v.areaId))?.padre_id ? "en esta subárea" : "en esta área") : "hoy";
+      return h("section", { class: "repaso" }, selector,
+        h("div", { class: "tarjeta-repaso repaso-vacio" },
+          h("h1", { class: "pregunta" }, `No hay nada para repasar ${donde}`),
+          h("p", { class: "suave" }, v.calificadas > 0 ? `Listo: repasaste ${v.calificadas} ${v.calificadas === 1 ? "tarjeta" : "tarjetas"}.` : "No hay tarjetas para repasar ahora."),
+          v.proxima && h("p", { class: "repaso-proxima" }, `Lo próximo toca el ${formatearFecha(v.proxima)}.`),
+          h("div", { class: "acciones acciones-centro" },
+            boton("Ver áreas", () => ir("areas"), "principal", { "data-foco": "1" }),
+            boton("Volver a Hoy", () => ir("hoy"), "suave"),
+            deshacer)));
     }
     const pista = v.hayPista && (v.pista !== undefined
       ? h("p", { class: "pista" }, v.pista)
       : boton("Ver pista", () => accion(() => repaso!.verPista()), "suave chico"));
     const zonaRespuesta = v.respuestaVisible
-      ? h("div", {},
+      ? [
           h("div", { class: "respuesta", tabindex: "-1", "data-foco": "1" }, h("span", { class: "etiqueta" }, "Respuesta"), h("p", {}, v.respuesta)),
-          h("div", { class: "botones-respuesta", role: "group", "aria-label": "Qué tan bien te salió" },
-            ...v.botones!.map((b) =>
-              h("button", { type: "button", class: `boton calificar calificar-${b.boton}`, onclick: () => calificar(b.boton) },
-                h("span", { class: "etiqueta-boton" }, b.etiqueta),
-                h("span", { class: "intervalo" }, b.intervalo),
-                h("kbd", {}, String(b.atajo))))))
-      : boton("Ver respuesta", () => accion(() => repaso!.verRespuesta()), "grande principal", { "data-foco": "1" });
-    return h("section", { class: "tarjeta-repaso" },
-      h("p", { class: "contexto" }, `${v.area} · quedan ${v.pendientes}`),
-      h("h1", { class: "pregunta" }, v.pregunta),
-      pista,
-      v.respuestaVisible ? null : h("p", { class: "suave" }, "Pensá la respuesta y tocá “Ver respuesta” (o Espacio)."),
-      zonaRespuesta,
-      deshacer);
+          h("div", { class: "calificacion" },
+            h("p", { class: "calificacion-titulo", id: "r-calif-titulo" }, "¿Qué tan bien te acordabas?"),
+            h("div", { class: "botones-respuesta", role: "group", "aria-labelledby": "r-calif-titulo" },
+              ...v.botones!.map((b) =>
+                h("button", { type: "button", class: `boton calificar calificar-${b.boton}`, onclick: () => calificar(b.boton) },
+                  h("span", { class: "etiqueta-boton" }, b.etiqueta),
+                  h("span", { class: "intervalo" }, b.intervalo),
+                  h("kbd", {}, String(b.atajo))))))]
+      : [boton("Ver respuesta", () => accion(() => repaso!.verRespuesta()), "grande principal", { "data-foco": "1" })];
+    const textoTarjeta = `Tarjeta ${v.numero} de ${v.total}`;
+    return h("section", { class: "repaso" }, selector,
+      h("div", { class: "repaso-progreso" },
+        h("div", { class: "repaso-progreso-texto" },
+          h("span", { class: "repaso-numero" }, textoTarjeta),
+          h("span", { class: "repaso-faltan" }, `Faltan ${v.faltan}`),
+          deshacer),
+        h("progress", { max: v.total!, value: v.calificadas, "aria-label": "Progreso del repaso", "aria-valuetext": textoTarjeta })),
+      h("article", { class: "tarjeta-repaso" },
+        h("div", { class: "tarjeta-cabeza" },
+          h("span", { class: "contexto" }, v.etiqueta),
+          v.hayResumen && h("button", {
+            type: "button", class: "enlace-accion", id: "r-ver-resumen",
+            onclick: () => accion(async () => { resumenRepaso = (await repaso!.resumenDelTema()) ?? null; focoEn = resumenRepaso ? "r-resumen" : null; }),
+          }, "Ver el resumen del tema")),
+        h("h1", { class: "pregunta" }, v.pregunta),
+        pista,
+        ...zonaRespuesta),
+      h("p", { class: "atajos suave" }, "Atajos: espacio para mostrar la respuesta · 1 a 4 para calificar · Ctrl+Z deshace"),
+      resumenRepaso && dialogoResumen(resumenRepaso));
   }
   function calificar(b: Calificacion): void { accion(() => repaso!.calificar(b)); }
 
@@ -1094,14 +1176,18 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     const partes: Hijo[] = [
       h("h1", {}, "Tarjetas"),
       h("div", { class: "barra" },
-        boton(importAbierto ? "Cerrar importación" : "Importar", () => accion(() => { importAbierto = !importAbierto; }), "principal"),
+        boton(importAbierto ? "Cerrar importación" : "Importar", () => accion(() => {
+          importAbierto = !importAbierto;
+          limpiarResultadosImportar();
+          textoImport = ""; // abrir o cerrar la caja empieza de cero: nada de la vez anterior
+        }), "principal"),
         boton("Deshacer última importación", () => accion(async () => {
           const r = await deshacerUltimaImportacion(d.almacen, d.reloj);
-          informe = null;
+          limpiarResultadosImportar();
           aviso = r ? `Se deshizo la última importación: ${r.tarjetas} ${r.tarjetas === 1 ? "tarjeta pasó" : "tarjetas pasaron"} a la papelera.` : "No hay ninguna importación para deshacer.";
         }), "suave"),
         boton(`${papelera ? "Ocultar" : "Ver"} papelera (${enPapelera.length})`, () => accion(() => { papelera = !papelera; }), "suave")),
-      importAbierto && dibujarImportar(),
+      importAbierto && await dibujarImportar(),
       buscador,
     ];
     if (papelera) {
@@ -1122,25 +1208,82 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     return h("section", {}, ...partes);
   }
 
-  function dibujarImportar(): Node {
+  /** Tarjeta de vista previa de un bloque (qué pasaría al confirmar). */
+  function bloquePrevio(b: BloqueRevisado): Node {
+    return h("article", { class: "bloque-previo" },
+      h("div", { class: "bloque-previo-cabeza" },
+        h("span", { class: "contexto" }, b.etiquetaArea),
+        h("span", { class: "suave" }, formatearFecha(b.fecha))),
+      h("h3", {}, b.tema),
+      h("p", { class: "bloque-previo-cuenta" },
+        h("strong", {}, plural(b.preguntas.length, "pregunta", "preguntas")), `: ${plural(b.nuevas, "nueva", "nuevas")}, ${plural(b.duplicadas, "duplicada", "duplicadas")}.`),
+      b.yaImportado && h("p", { class: "aviso", role: "status" }, "Este bloque ya estaba importado: no hay nada nuevo para crear."),
+      b.avisos.length > 0 && h("ul", { class: "avisos" }, ...b.avisos.map((a) => h("li", {}, a))),
+      b.resumen && h("div", { class: "bloque-previo-resumen" }, h("span", { class: "etiqueta" }, "Resumen"), renderizarMarkdown(doc, b.resumen)),
+      h("ul", { class: "preguntas-previas", "aria-label": `Preguntas de ${b.tema}` },
+        ...b.preguntas.map((q) => h("li", { class: q.estado === "nueva" ? "nueva" : "duplicada" },
+          h("span", { class: "pregunta-previa" }, q.p),
+          h("span", { class: `insignia-estado ${q.estado === "nueva" ? "estado-hoy" : "estado-aldia"}` }, q.estado === "nueva" ? "Nueva" : "Duplicada")))));
+  }
+
+  async function dibujarImportar(): Promise<Node> {
+    const raices = (await d.almacen.areas.listar()).filter((a) => a.padre_id === null).map((a) => a.nombre).sort((x, y) => x.localeCompare(y, "es"));
+    const zona = h("div", { class: "importar-zona" });
     const caja = h("textarea", {
-      id: "caja-importar", rows: 8, placeholder: "Pegá acá el JSON que generó Claude", "aria-label": "JSON para importar",
-      oninput: (ev: Event) => { textoImport = (ev.target as HTMLTextAreaElement).value; },
+      id: "caja-importar", rows: 8, placeholder: "Pegá acá el JSON que generó Claude", "aria-label": "JSON para importar", spellcheck: "false",
+      oninput: (ev: Event) => {
+        textoImport = (ev.target as HTMLTextAreaElement).value;
+        // Cambió el texto: la vista previa, el informe y el recordatorio ya no corresponden. Se quitan sin redibujar (no se pierde el cursor).
+        if (informe || revision || recordatorioImport) { limpiarResultadosImportar(); zona.replaceChildren(); }
+      },
     });
     (caja as HTMLTextAreaElement).value = textoImport;
-    const partes: Hijo[] = [caja, boton("Confirmar importación", () => accion(async () => {
+    const revisar = () => accion(async () => {
+      limpiarResultadosImportar();
+      if (textoImport.trim() === "") { recordatorioImport = "Pegá primero el JSON que generó Claude."; focoEn = "caja-importar"; return; }
+      revision = await revisarImportacion(d.almacen, d.reloj, textoImport);
+      focoEn = revision.bloques.length > 0 ? "importar-previa" : "importar-errores"; // el foco va al principio de lo nuevo, no al final
+    });
+    const confirmar = () => accion(async () => {
       const r = await importar(d.almacen, d.reloj, textoImport);
+      limpiarResultadosImportar();
       informe = r;
       // Si hubo errores el texto queda en la caja para corregirlo; si no, se limpia.
       textoImport = r.errores.length > 0 ? r.texto_original : "";
-    }), "principal")];
+      focoEn = "importar-informe"; // el informe queda a la vista
+    });
+    const cancelar = () => accion(() => { limpiarResultadosImportar(); focoEn = "caja-importar"; });
+    const partes: Hijo[] = [];
+    if (recordatorioImport) partes.push(h("p", { class: "recordatorio", role: "status" }, recordatorioImport));
+    if (revision) {
+      const rv = revision;
+      if (rv.errores.length > 0) {
+        partes.push(h("div", { class: "informe", role: "alert", id: "importar-errores", tabindex: "-1" },
+          h("p", {}, h("strong", {}, rv.bloques.length > 0 ? "Hay partes del texto que no pude leer:" : "No pude leer el texto. Corregilo y probá de nuevo:")),
+          h("ul", { class: "errores" }, ...rv.errores.map((e) => h("li", {}, e)))));
+      }
+      if (rv.bloques.length > 0) {
+        partes.push(h("div", { class: "vista-previa", role: "region", "aria-label": "Vista previa de la importación", id: "importar-previa", tabindex: "-1" },
+          h("p", { class: "vista-previa-total" }, h("strong", {}, "Esto es lo que pasaría: "), `${plural(rv.nuevas, "tarjeta nueva", "tarjetas nuevas")} y ${plural(rv.duplicadas, "duplicada omitida", "duplicadas omitidas")}. Todavía no se creó nada.`),
+          ...rv.bloques.map(bloquePrevio)));
+        partes.push(h("div", { class: "acciones" },
+          rv.puedeConfirmar && boton("Confirmar importación", confirmar, "principal", { id: "importar-confirmar" }),
+          boton("Cancelar", cancelar, "suave", { id: "importar-cancelar" })));
+        if (!rv.puedeConfirmar) partes.push(h("p", { class: "suave" }, "No hay nada nuevo para importar."));
+      }
+    }
     if (informe) {
-      partes.push(h("div", { class: "informe", role: "status" },
+      partes.push(h("div", { class: "informe", role: "status", id: "importar-informe", tabindex: "-1" },
         h("p", {}, h("strong", {}, `Creadas: ${informe.creadas}`), ` · Duplicadas omitidas: ${informe.duplicadas} · Errores: ${informe.errores.length}`),
         informe.errores.length > 0 && h("ul", { class: "errores" }, ...informe.errores.map((e) => h("li", {}, e))),
         informe.avisos.length > 0 && h("ul", { class: "avisos" }, ...informe.avisos.map((a) => h("li", {}, a)))));
     }
-    return h("div", { class: "importar" }, ...partes);
+    zona.append(...partes.filter((x): x is Node => !!x));
+    return h("div", { class: "importar" },
+      raices.length > 0 && h("p", { class: "suave ayuda-areas" }, h("strong", {}, "Tus áreas: "), `${raices.join(", ")}.`),
+      caja,
+      h("div", { class: "acciones" }, boton("Revisar", revisar, "principal", { id: "importar-revisar" })),
+      zona);
   }
 
   function filaTarjeta(t: Tarjeta): Node {
@@ -1196,6 +1339,7 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
       errorAjustes && h("p", { class: "aviso", role: "alert" }, errorAjustes),
       d.sync && dibujarCuenta(d.sync),
       dibujarRespaldo(),
+      dibujarMigracion(),
       d.sync && dibujarExterno(d.sync),
       d.sync && dibujarAudioAjustes(d.sync));
   }
@@ -1369,6 +1513,44 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
         h("ul", { class: informeRespaldo.ok ? "" : "errores" }, ...lineasDeInforme(informeRespaldo).map((l) => h("li", {}, l)))));
   }
 
+  /** Importar el respaldo del Lean OS original (ZIP de "Exportar todo" o sus JSON): suma sin duplicar y nunca pierde nada. */
+  function dibujarMigracion(): Node {
+    const archivo = h("input", {
+      type: "file", id: "archivo-original", multiple: true, accept: ".zip,.json,application/zip,application/json", "aria-label": "Archivos del respaldo del Lean OS original",
+      onchange: (ev: Event) => {
+        const el = ev.target as HTMLInputElement;
+        const elegidos = Array.from((el.files ?? []) as ArrayLike<File>);
+        if (elegidos.length === 0) return;
+        accion(async () => {
+          const leer = d.leerBytes ?? (async (f: File) => new Uint8Array(await f.arrayBuffer()));
+          const archivos: ArchivoAImportar[] = [];
+          const fallos: string[] = [];
+          for (const f of elegidos) {
+            try { archivos.push({ nombre: f.name, bytes: await leer(f) }); }
+            catch { fallos.push(`"${f.name || "(sin nombre)"}": no se pudo leer el archivo. No se cambió nada.`); }
+          }
+          let r: InformeMigracion;
+          try {
+            r = await importarRespaldoOriginal(d.almacen, d.reloj, archivos, { horaCambio: cargarAjustes(d.persistencia).horaCambio });
+          } catch {
+            r = { areas: 0, subareas: 0, temas: 0, creadas: 0, duplicadas: 0, avisos: [], errores: ["No se pudo importar el respaldo. No se cambió nada; probá de nuevo con otro archivo."] };
+          }
+          informeMigracion = { ...r, errores: [...fallos, ...r.errores] };
+          try { el.value = ""; } catch { /* algunos navegadores no dejan limpiarlo: igual se redibuja */ }
+        });
+      },
+    }) as HTMLInputElement;
+    const l = informeMigracion ? lineasDeMigracion(informeMigracion) : null;
+    return h("div", { class: "respaldo migracion", id: "migracion" },
+      h("h2", {}, "Importar respaldo del Lean OS original"),
+      h("p", { class: "suave" }, "Elegí el ZIP que descargaste con “Exportar todo” en el Lean OS original, o sus archivos JSON. Se suman a lo que ya tenés sin duplicar nada ni pisar tus repasos."),
+      h("label", {}, "Archivos del respaldo original", archivo),
+      l && h("div", { class: "informe", role: "status" },
+        h("p", {}, h("strong", {}, l.resumen)),
+        l.avisos.length > 0 && h("ul", { class: "avisos" }, ...l.avisos.map((x) => h("li", {}, x))),
+        l.errores.length > 0 && h("ul", { class: "errores" }, ...l.errores.map((x) => h("li", {}, x)))));
+  }
+
   /** Descarga un texto como archivo desde el navegador. */
   function descargarEnNavegador(nombre: string, texto: string): void {
     const ventana = doc.defaultView!;
@@ -1387,6 +1569,22 @@ export function montarApp(raiz: HTMLElement, d: Dependencias, inicial: Pantalla 
     if (pantalla !== "repaso" || !repaso) return;
     const ke = ev as KeyboardEvent;
     const tag = (ke.target as HTMLElement | null)?.tagName ?? "";
+    if (resumenRepaso) {
+      // Con el resumen abierto solo valen Escape (cierra) y Tab (el foco se queda dentro); nada de atajos de calificación.
+      if (ke.key === "Escape") {
+        accion(() => { resumenRepaso = null; focoEn = "r-ver-resumen"; });
+      } else if (ke.key === "Tab") {
+        const dentro = [...principal.querySelectorAll<HTMLElement>("#r-resumen [tabindex='0'], #r-resumen button")];
+        if (dentro.length === 0) return;
+        const i = dentro.indexOf(doc.activeElement as HTMLElement);
+        const sig = ke.shiftKey ? (i <= 0 ? dentro.length - 1 : i - 1) : (i < 0 || i === dentro.length - 1 ? 0 : i + 1);
+        ke.preventDefault();
+        dentro[sig]!.focus();
+      } else if (ke.key === " " || /^[1-4]$/.test(ke.key) || ((ke.ctrlKey || ke.metaKey) && ke.key.toLowerCase() === "z")) {
+        if (tag !== "BUTTON") ke.preventDefault();
+      }
+      return;
+    }
     if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
     if ((ke.ctrlKey || ke.metaKey) && ke.key.toLowerCase() === "z") {
       ke.preventDefault();

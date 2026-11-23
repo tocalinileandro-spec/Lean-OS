@@ -145,6 +145,7 @@ describe("interfaz de tareas, metas y apuntes", () => {
     await ui.ir("tarjetas");
     await ui.clic("Importar");
     await ui.escribir("#caja-importar", JSON.stringify({ tipo: "aprendizaje", fecha: "2026-11-22", area: "Mate", tema: "T", preguntas: [{ p: "a", r: "b" }, { p: "c", r: "d" }] }));
+    await ui.clic("Revisar");
     await ui.clic("Confirmar importación");
     await ui.ir("hoy");
     expect(ui.raiz.textContent).toContain("Repasar 2 tarjetas");
@@ -307,6 +308,7 @@ describe("interfaz de tareas, metas y apuntes", () => {
     await ui.ir("tarjetas");
     await ui.clic("Importar");
     await ui.escribir("#caja-importar", JSON.stringify({ tipo: "aprendizaje", fecha: "2026-11-22", area: "Mate", tema: "T", preguntas: [{ p: "Pregunta uno", r: "r" }] }));
+    await ui.clic("Revisar");
     await ui.clic("Confirmar importación");
     await crearTarea(ui.almacen, reloj, { titulo: "Tarea para borrar" });
     const { crearMetaAnual } = await import("../src/compartido/tareas.ts");

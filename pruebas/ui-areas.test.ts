@@ -152,7 +152,7 @@ describe("P2: la primera pantalla es Áreas", () => {
     expect([...ui.doc.querySelectorAll('.nav-item[aria-current="page"] .nav-texto')].map((x) => x.textContent)).toEqual(["Repaso"]);
     const res = await resumenAreas(a, ui.r, { limiteNuevas: cargarAjustes(ui.persistencia).nuevasPorDia });
     expect(res.totalParaHoy).toBeGreaterThan(0);
-    expect(ui.texto()).toContain(`quedan ${res.totalParaHoy}`);
+    expect(ui.texto()).toContain(`Tarjeta 1 de ${res.totalParaHoy}`);
   });
 
   it("P2: sin áreas muestra un estado vacío con 'Crear área' e 'Importar' (que abre la caja de importar)", async () => {
@@ -191,7 +191,7 @@ describe("P2: la primera pantalla es Áreas", () => {
 });
 
 describe("P3 (UI): crear áreas y subáreas desde la interfaz", () => {
-  it("P3 (UI): crear un área con el botón y con Enter abre su detalle", async () => {
+  it("P3: crear un área con el botón y con Enter abre su detalle", async () => {
     const ui = await abrir();
     await ui.escribir("#a-nueva-area", "Programación");
     await ui.clic("Crear área");
@@ -207,7 +207,7 @@ describe("P3 (UI): crear áreas y subáreas desde la interfaz", () => {
     expect(ui.doc.querySelector("h1")!.textContent).toBe("Idiomas");
   });
 
-  it("P3 (UI): crear una subárea cuelga del área; repetida (otras tildes y mayúsculas) avisa y no duplica", async () => {
+  it("P3: crear una subárea cuelga del área; repetida (otras tildes y mayúsculas) avisa y no duplica", async () => {
     const ui = await abrir();
     await ui.escribir("#a-nueva-area", "Programación");
     await ui.clic("Crear área");
@@ -234,7 +234,7 @@ describe("P3 (UI): crear áreas y subáreas desde la interfaz", () => {
     expect(ui.doc.querySelector("h1")!.textContent).toBe("Tus áreas");
   });
 
-  it("P3 (UI): nombre vacío o de más de 60 letras se rechaza con un mensaje y lo escrito queda", async () => {
+  it("P3: nombre vacío o de más de 60 letras se rechaza con un mensaje y lo escrito queda", async () => {
     const ui = await abrir();
     await ui.escribir("#a-nueva-area", "   ");
     await ui.clic("Crear área");
@@ -259,7 +259,7 @@ describe("P6 (UI): detalle de área", () => {
     return { a, r, ui };
   }
 
-  it("P6 (UI): el detalle lista subáreas con sus temas, 'N hoy', 'Al día' y 'Nuevo', y 'Repasar esta área · N'", async () => {
+  it("P6: el detalle lista subáreas con sus temas, 'N hoy', 'Al día' y 'Nuevo', y 'Repasar esta área · N'", async () => {
     // Tope de 3 nuevas por día: "Funciones" las usa todas, "Bucles" queda "Nuevo" (fuera del tope) y "Listas" (ya repasada, vence más adelante) "Al día".
     const { a, r, ui } = await conTemas(3);
     const lis = (await a.importaciones.listar()).find((x) => x.tema === "Listas")!;
@@ -295,7 +295,7 @@ describe("P6 (UI): detalle de área", () => {
     expect(ui.boton("Importar tarjetas")).toBeTruthy();
   });
 
-  it("P6 (UI): 'Ver el resumen' muestra el resumen y no revela respuestas; Escape cierra el menú", async () => {
+  it("P6: 'Ver el resumen' muestra el resumen y no revela respuestas; Escape cierra el menú", async () => {
     const { ui } = await conTemas();
     await ui.clic("Programación");
     await ui.clicAria("Más opciones de Funciones");
@@ -311,7 +311,7 @@ describe("P6 (UI): detalle de área", () => {
     expect(ui.texto()).not.toContain("Las funciones agrupan código.");
   });
 
-  it("P6 (UI): mover un tema a otra subárea y a otra área conserva el estado de repaso; el mismo lugar avisa y no cambia nada", async () => {
+  it("P6: mover un tema a otra subárea y a otra área conserva el estado de repaso; el mismo lugar avisa y no cambia nada", async () => {
     const { a, ui } = await conTemas();
     const imp = (await a.importaciones.listar()).find((x) => x.tema === "Funciones")!;
     const tj3 = (await a.tarjetas.listar()).filter((x) => x.importacion_id === imp.id);
@@ -357,17 +357,17 @@ describe("P6 (UI): detalle de área", () => {
     expect(ui.doc.querySelector("h1")!.textContent).toBe("Tus áreas");
   });
 
-  it("P6 (UI): 'Repasar esta área' y 'Repasar · N' de una subárea abren el Repaso solo con esas tarjetas", async () => {
+  it("P6: 'Repasar esta área' y 'Repasar · N' de una subárea abren el Repaso solo con esas tarjetas", async () => {
     const { a, r, ui } = await conTemas();
     await ui.clic("Programación");
     await ui.clic("Repasar esta área");
-    expect(ui.texto()).toContain("quedan 7");
+    expect(ui.texto()).toContain("Tarjeta 1 de 7");
     await ui.clic("Áreas");
     await ui.clic("Programación");
     const cs = [...ui.doc.querySelectorAll(".seccion-area")][0]!;
     (cs.querySelector("button")! as unknown as HTMLButtonElement).click();
     await ui.app.esperar();
-    expect(ui.texto()).toContain("quedan 5");
+    expect(ui.texto()).toContain("Tarjeta 1 de 5");
     // La lógica: el filtro por área también lo acepta la pantalla de Repaso.
     const p = await PantallaRepaso.iniciar({ almacen: a, reloj: r, persistencia: new Memoria() }, { areaId: await idArea(a, "Idiomas") });
     expect((await p.vista()).pendientes).toBe(2);
@@ -375,7 +375,7 @@ describe("P6 (UI): detalle de área", () => {
     expect((await todo.vista()).pendientes).toBe(9);
   });
 
-  it("P6 (UI): una tarjeta suelta se lista aparte, sin mover ni borrar", async () => {
+  it("P6: una tarjeta suelta se lista aparte, sin mover ni borrar", async () => {
     const a = new AlmacenMemoria();
     await a.areas.guardar(area("x", "Cocina"));
     await a.tarjetas.guardarVarios(rep(2, { area_id: "x" }));
@@ -397,7 +397,7 @@ describe("P7 (UI): borrar con confirmación, deshacer y papelera", () => {
   }
   const vivas = async (a: AlmacenMemoria) => (await a.tarjetas.listar()).length;
 
-  it("P7 (UI): borrar un tema muestra la confirmación con los conteos; cancelar no cambia nada; confirmar lo manda a la papelera y Deshacer lo restaura", async () => {
+  it("P7: borrar un tema muestra la confirmación con los conteos; cancelar no cambia nada; confirmar lo manda a la papelera y Deshacer lo restaura", async () => {
     const { a, ui } = await conTemas();
     const total = await vivas(a);
     await ui.clic("Programación");
@@ -431,7 +431,7 @@ describe("P7 (UI): borrar con confirmación, deshacer y papelera", () => {
     expect(ui.confirmaciones()).toBe(0);
   });
 
-  it("P7 (UI): borrar una subárea y un área con subáreas; salen de Áreas y del Repaso; Deshacer vuelve al detalle", async () => {
+  it("P7: borrar una subárea y un área con subáreas; salen de Áreas y del Repaso; Deshacer vuelve al detalle", async () => {
     const { a, ui } = await conTemas();
     await ui.clic("Programación");
     await ui.clic("Borrar subárea");
@@ -458,7 +458,7 @@ describe("P7 (UI): borrar con confirmación, deshacer y papelera", () => {
     expect((await a.areas.listar()).map((x) => x.nombre).sort()).toEqual(["Idiomas", "Programación", "Python"]);
   });
 
-  it("P7 (UI): la papelera de Tarjetas muestra el detalle del conjunto y restaurar pide primero el área si hace falta", async () => {
+  it("P7: la papelera de Tarjetas muestra el detalle del conjunto y restaurar pide primero el área si hace falta", async () => {
     const { a, ui } = await conTemas();
     await ui.clic("Programación");
     await ui.clic("Borrar subárea");
@@ -488,7 +488,7 @@ describe("P2/P6 (CSS): nombres largos y objetivos táctiles", () => {
   const css = readFileSync(new URL("../src/cliente/estilos.css", import.meta.url), "utf8");
   const regla = (sel: string) => css.replace(/\/\*[\s\S]*?\*\//g, "").split("}").map((b) => b.split("{")).filter((p) => p.length === 2 && p[0]!.split(",").map((x) => x.trim()).includes(sel)).map((p) => p[1]!).join(";");
 
-  it("P2 (CSS): los nombres largos sin espacios se cortan y los items de grilla y flex pueden encogerse", () => {
+  it("P2: los nombres largos sin espacios se cortan y los items de grilla y flex pueden encogerse", () => {
     for (const sel of [".area-nombre", ".area-abrir", ".etiquetas-sub li", ".encabezado-pantalla h1", ".fila-tema-nombre", ".confirmacion p", ".aviso"]) {
       expect(regla(sel), sel).toMatch(/overflow-wrap:\s*anywhere/);
     }
@@ -496,12 +496,12 @@ describe("P2/P6 (CSS): nombres largos y objetivos táctiles", () => {
     expect(regla(".mover-tema select")).toMatch(/max-width:\s*100%/);
   });
 
-  it("P2 (CSS): el botón que abre el área mide 44 px o más", () => {
+  it("P2: el botón que abre el área mide 44 px o más", () => {
     expect(regla(".area-abrir")).toMatch(/min-height:\s*var\(--toque\)/);
     expect(regla(".area-abrir")).toMatch(/min-width:\s*var\(--toque\)/);
   });
 
-  it("P7 (UI): borrar una subárea dice solo temas y tarjetas; un área con subáreas dice 2 subáreas, 3 temas, 4 tarjetas", async () => {
+  it("P7: borrar una subárea dice solo temas y tarjetas; un área con subáreas dice 2 subáreas, 3 temas, 4 tarjetas", async () => {
     const a = new AlmacenMemoria();
     const r = new RelojSimulado(AHORA);
     await importar(a, r, BLOQUE("Programación > CS50", "Funciones", 2));
@@ -517,7 +517,7 @@ describe("P2/P6 (CSS): nombres largos y objetivos táctiles", () => {
     expect(ui.doc.querySelector(".confirmacion")!.textContent).toContain("Se van a la papelera: 2 subáreas, 3 temas, 4 tarjetas.");
   });
 
-  it("P3 (UI): el mensaje de nombre vacío dice 'del área' y 'de la subárea'", async () => {
+  it("P3: el mensaje de nombre vacío dice 'del área' y 'de la subárea'", async () => {
     const ui = await abrir();
     await ui.clic("Crear área");
     expect(ui.texto()).toContain("El nombre del área no puede quedar vacío.");

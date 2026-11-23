@@ -4,6 +4,7 @@
  * Sin cambios de esquema: todo se resuelve con los campos que ya existen.
  */
 import type { Almacen } from "./almacen.ts";
+import { diaLogico } from "./dia.ts";
 import type { Apunte, Area, Id, Importacion, Tarjeta } from "./esquema.ts";
 import { normalizar } from "./normalizar.ts";
 import { construirCola, esNueva, type OpcionesCola } from "./repaso.ts";
@@ -164,6 +165,31 @@ export async function contadoresDeRepaso(almacen: Almacen, reloj: Reloj, opcione
     return { id: a.id, nombre: a.nombre, subareas, paraHoy: cuenta(a.id) + subareas.reduce((n, s) => n + s.paraHoy, 0) };
   });
   return { todo: cola.length, areas };
+}
+
+/** Suma días a una fecha AAAA-MM-DD (calendario UTC puro). */
+function masDias(iso: string, dias: number): string {
+  const [a, m, d] = iso.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10);
+}
+
+/**
+ * Fecha en que vuelve a tocar repasar algo dentro del filtro (el área incluye sus subáreas), para el estado vacío del Repaso.
+ * Mira las tarjetas activas (vivas y no suspendidas): si alguna toca hoy devuelve hoy; si no, el menor vencimiento futuro.
+ * Las tarjetas nuevas que quedaron fuera del tope diario cuentan como "mañana". Sin tarjetas activas devuelve null.
+ */
+export async function proximaFechaDeRepaso(almacen: Almacen, reloj: Reloj, opciones: OpcionesCola & { areaId?: Id | null } = {}): Promise<string | null> {
+  const { areaId } = opciones;
+  const hoy = diaLogico(reloj);
+  const ids = areaId ? idsConSubareas(await almacen.areas.listar(), areaId) : null;
+  const activas = (await almacen.tarjetas.listar()).filter((t) => !t.suspendida && (!ids || ids.has(t.area_id)));
+  if (activas.length === 0) return null;
+  if ((await colaDeRepaso(almacen, reloj, opciones)).length > 0) return hoy;
+  const futuras = activas.filter((t) => t.vence > hoy).map((t) => t.vence).sort();
+  const sobrantes = activas.some((t) => t.vence <= hoy);
+  const manana = masDias(hoy, 1);
+  const candidatas = [...futuras.slice(0, 1), ...(sobrantes ? [manana] : [])].sort();
+  return candidatas[0] ?? null;
 }
 
 // ---------- Detalle de área ----------

@@ -62,6 +62,7 @@ async function conTarjetas() {
   await ui.app.esperar();
   await ui.clic("Importar");
   await ui.escribir("#caja-importar", BLOQUE);
+  await ui.clic("Revisar");
   await ui.clic("Confirmar importación");
   return { fabrica, persistencia, reloj, ui };
 }
@@ -101,9 +102,13 @@ describe("interfaz web", () => {
     const { fabrica, persistencia, reloj, ui } = await conTarjetas();
     expect(ui.raiz.textContent).toContain("Creadas: 2");
     // Informe de duplicadas al reimportar
+    // Con revisión (P8): el bloque ya importado se avisa en la vista previa y no se ofrece confirmar (no crea nada nuevo).
     await ui.escribir("#caja-importar", BLOQUE);
-    await ui.clic("Confirmar importación");
-    expect(ui.raiz.textContent).toContain("Creadas: 0 · Duplicadas omitidas: 2");
+    await ui.clic("Revisar");
+    expect(ui.raiz.textContent).toContain("2 preguntas: 0 nuevas, 2 duplicadas");
+    expect(ui.raiz.textContent).toContain("ya estaba importado");
+    expect(ui.botonPorTexto("Confirmar importación")).toBeUndefined();
+    expect((await ui.almacen.tarjetas.listar()).length).toBe(2);
 
     ui.app.ir("hoy");
     await ui.app.esperar();
@@ -113,9 +118,9 @@ describe("interfaz web", () => {
 
     await ui.tecla(" ");
     await ui.tecla("3"); // Bien
-    expect(ui.raiz.textContent).toContain("quedan 1");
+    expect(ui.raiz.textContent).toContain("Tarjeta 2 de 2");
     await ui.tecla("z", { ctrlKey: true }); // deshace
-    expect(ui.raiz.textContent).toContain("quedan 2");
+    expect(ui.raiz.textContent).toContain("Tarjeta 1 de 2");
     await ui.tecla(" ");
     await ui.tecla("3");
     await ui.tecla(" ");
@@ -144,10 +149,11 @@ describe("interfaz web", () => {
     await ui.clic("Importar");
     const cortado = BLOQUE.slice(0, 40);
     await ui.escribir("#caja-importar", cortado);
-    await ui.clic("Confirmar importación");
+    await ui.clic("Revisar");
     expect((ui.doc.querySelector("#caja-importar") as unknown as HTMLTextAreaElement).value).toBe(cortado);
-    expect(ui.raiz.textContent).toContain("Creadas: 0");
+    expect(ui.botonPorTexto("Confirmar importación")).toBeUndefined();
     expect(ui.raiz.querySelector(".errores")).not.toBeNull();
+    expect((await ui.almacen.tarjetas.listar()).length).toBe(0);
 
     ui.app.ir("ajustes");
     await ui.app.esperar();
