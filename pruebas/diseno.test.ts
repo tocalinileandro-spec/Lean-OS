@@ -108,7 +108,7 @@ async function abrirApp(persistencia: Persistencia = new Memoria()) {
   ventana.document.body.append(rootEl);
   const almacen = await AlmacenIndexedDB.abrir("lean-os-diseno", new IDBFactory());
   const reloj = new RelojSimulado("2026-11-22T15:00:00.000Z");
-  const app: AppMontada = montarApp(rootEl as unknown as HTMLElement, { almacen, reloj, persistencia });
+  const app: AppMontada = montarApp(rootEl as unknown as HTMLElement, { almacen, reloj, persistencia }, "hoy");
   await app.esperar();
   return { ventana, doc: ventana.document, app, almacen, persistencia };
 }

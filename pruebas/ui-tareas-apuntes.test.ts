@@ -24,7 +24,7 @@ async function abrir(fabrica: IDBFactory, reloj: RelojSimulado) {
   const raiz = ventana.document.createElement("div");
   ventana.document.body.append(raiz);
   const almacen = await AlmacenIndexedDB.abrir("lean-os-ui-ta", fabrica);
-  const app: AppMontada = montarApp(raiz as unknown as HTMLElement, { almacen, reloj, persistencia: new Memoria() });
+  const app: AppMontada = montarApp(raiz as unknown as HTMLElement, { almacen, reloj, persistencia: new Memoria() }, "hoy");
   await app.esperar();
   const doc = ventana.document;
   const q = <T extends Element>(sel: string) => doc.querySelector(sel) as unknown as T;
