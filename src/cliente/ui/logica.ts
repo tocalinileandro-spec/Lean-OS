@@ -73,6 +73,11 @@ export function fechaLarga(iso: FechaISO): string {
   const semana = new Date(Date.UTC(a, m - 1, dia)).getUTCDay();
   return `${DIAS_LARGOS[semana]} ${dia} de ${MESES_LARGOS[m - 1]}`;
 }
+/** Saludo sobrio según la hora de Buenos Aires. */
+export function saludoDelDia(ahora: Date): string {
+  const hora = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "America/Argentina/Buenos_Aires" }).format(ahora)) % 24;
+  return hora >= 5 && hora < 12 ? "Buen día" : hora >= 12 && hora < 20 ? "Buenas tardes" : "Buenas noches";
+}
 export const ETIQUETAS: Record<Calificacion, string> = { otra_vez: "Otra vez", dificil: "Difícil", bien: "Bien", facil: "Fácil" };
 
 // ---------- Ajustes ----------
