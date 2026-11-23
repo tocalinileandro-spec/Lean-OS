@@ -152,7 +152,7 @@ describe("P2: la primera pantalla es Áreas", () => {
     expect([...ui.doc.querySelectorAll('.nav-item[aria-current="page"] .nav-texto')].map((x) => x.textContent)).toEqual(["Repaso"]);
     const res = await resumenAreas(a, ui.r, { limiteNuevas: cargarAjustes(ui.persistencia).nuevasPorDia });
     expect(res.totalParaHoy).toBeGreaterThan(0);
-    expect(ui.texto()).toContain(`quedan ${res.totalParaHoy}`);
+    expect(ui.texto()).toContain(`Tarjeta 1 de ${res.totalParaHoy}`);
   });
 
   it("P2: sin áreas muestra un estado vacío con 'Crear área' e 'Importar' (que abre la caja de importar)", async () => {
@@ -361,13 +361,13 @@ describe("P6 (UI): detalle de área", () => {
     const { a, r, ui } = await conTemas();
     await ui.clic("Programación");
     await ui.clic("Repasar esta área");
-    expect(ui.texto()).toContain("quedan 7");
+    expect(ui.texto()).toContain("Tarjeta 1 de 7");
     await ui.clic("Áreas");
     await ui.clic("Programación");
     const cs = [...ui.doc.querySelectorAll(".seccion-area")][0]!;
     (cs.querySelector("button")! as unknown as HTMLButtonElement).click();
     await ui.app.esperar();
-    expect(ui.texto()).toContain("quedan 5");
+    expect(ui.texto()).toContain("Tarjeta 1 de 5");
     // La lógica: el filtro por área también lo acepta la pantalla de Repaso.
     const p = await PantallaRepaso.iniciar({ almacen: a, reloj: r, persistencia: new Memoria() }, { areaId: await idArea(a, "Idiomas") });
     expect((await p.vista()).pendientes).toBe(2);

@@ -12,7 +12,8 @@ import { calcularEstadisticas, type Estadisticas } from "../../compartido/estadi
 import { normalizar } from "../../compartido/normalizar.ts";
 import { tareasDeHoy } from "../../compartido/tareas.ts";
 import { calificar, construirCola, SesionRepaso } from "../../compartido/repaso.ts";
-import { colaDeRepaso } from "../../compartido/areas.ts";
+import type { InformeMigracion } from "../../compartido/migracion-original.ts";
+import { colaDeRepaso, contextoDeTarjeta, proximaFechaDeRepaso, type ContextoTarjeta } from "../../compartido/areas.ts";
 import type { Reloj } from "../../compartido/reloj.ts";
 import type { ControlSync } from "../sync/motor.ts";
 
@@ -26,6 +27,8 @@ export interface Dependencias {
   descargar?: (nombre: string, texto: string) => void;
   /** Lee el texto del archivo elegido para importar (por defecto, `file.text()`). */
   leerArchivo?: (archivo: File) => Promise<string>;
+  /** Lee los bytes del archivo elegido para importar el respaldo del Lean OS original (por defecto, `file.arrayBuffer()`). */
+  leerBytes?: (archivo: File) => Promise<Uint8Array>;
 }
 
 /** Lo mínimo que se usa de localStorage (se inyecta otra cosa en las pruebas). */
@@ -134,6 +137,20 @@ export function aplicarTema(html: { setAttribute(k: string, v: string): void; re
   else html.removeAttribute("data-tema");
 }
 
+// ---------- Migración desde el Lean OS original ----------
+
+const plu = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+
+/** Resumen en castellano del informe de la migración (lo que se muestra en Ajustes). */
+export function lineasDeMigracion(i: InformeMigracion): { resumen: string; avisos: string[]; errores: string[] } {
+  const leido = i.areas + i.subareas + i.temas === 0 ? "No se leyó ninguna área ni tema." : `Se leyeron ${plu(i.areas, "área", "áreas")}, ${plu(i.subareas, "subárea", "subáreas")} y ${plu(i.temas, "tema", "temas")}.`;
+  return {
+    resumen: `${leido} Tarjetas creadas: ${i.creadas}. Duplicadas omitidas: ${i.duplicadas}.`,
+    avisos: i.avisos,
+    errores: i.errores,
+  };
+}
+
 // ---------- Áreas ----------
 
 export function nombreDeArea(area: Area, areas: Area[]): string {
@@ -180,11 +197,31 @@ export interface BotonRepaso {
   atajo: number;
 }
 
+/** "Área › Subárea · Tema", "Área · Tema" (sin subárea) o "Área › Subárea" (tarjeta sin tema). */
+export function etiquetaDeContexto(c: ContextoTarjeta): string {
+  const lugar = c.subarea ? `${c.area.nombre} › ${c.subarea.nombre}` : c.area.nombre;
+  return c.tema ? `${lugar} · ${c.tema.nombre}` : lugar;
+}
+
 export interface VistaRepaso {
   hayTarjeta: boolean;
+  /** Tarjetas que faltan en la cola de la sesión, contando la actual (el "Otra vez" la vuelve a poner al final). */
   pendientes: number;
   calificadas: number;
   puedeDeshacer: boolean;
+  /** Filtro de la sesión: id del área o subárea (null = todo lo de hoy). */
+  areaId: Id | null;
+  /** Con tarjeta: "Tarjeta {numero} de {total}". numero = calificadas + 1; total = calificadas + pendientes (crece con cada "Otra vez"). */
+  numero?: number;
+  total?: number;
+  /** Tarjetas que faltan después de la actual (total - numero). */
+  faltan?: number;
+  /** Sin tarjeta: fecha (AAAA-MM-DD) de lo próximo dentro del filtro, o null si no hay nada activo. */
+  proxima?: string | null;
+  /** Etiqueta de contexto de la tarjeta actual. */
+  etiqueta?: string;
+  /** La tarjeta tiene un resumen de tema para mostrar (el texto se pide aparte con `resumenDelTema`). */
+  hayResumen?: boolean;
   area?: string;
   pregunta?: string;
   /** Solo existe si hay pista; el texto va a la vista únicamente cuando se la pidió. */
@@ -202,13 +239,16 @@ export class PantallaRepaso {
   #idPista: Id | undefined;
   #calificadas = 0;
 
-  private constructor(private d: Dependencias, private sesion: SesionRepaso) {}
+  private constructor(private d: Dependencias, private sesion: SesionRepaso, private filtro: Id | null) {}
+
+  /** Filtro con el que arrancó la sesión (se mantiene mientras se califica). */
+  get areaId(): Id | null { return this.filtro; }
 
   /** `areaId` filtra la cola por esa área (incluye sus subáreas; una subárea solo lo suyo); el tope de nuevas se aplica antes. */
   static async iniciar(d: Dependencias, filtro: { areaId?: Id | null } = {}): Promise<PantallaRepaso> {
     const aj = cargarAjustes(d.persistencia);
     const cola = await colaDeRepaso(d.almacen, d.reloj, { limiteNuevas: aj.nuevasPorDia, areaId: filtro.areaId ?? null });
-    return new PantallaRepaso(d, new SesionRepaso(d.almacen, d.reloj, cola));
+    return new PantallaRepaso(d, new SesionRepaso(d.almacen, d.reloj, cola), filtro.areaId ?? null);
   }
 
   /** Sin tarjeta actual (por ejemplo, la borraron desde otra pestaña) no hace nada. */
@@ -221,15 +261,21 @@ export class PantallaRepaso {
 
   async vista(): Promise<VistaRepaso> {
     const id = await this.sesion.siguiente();
-    const base = { pendientes: this.sesion.pendientes, calificadas: this.#calificadas, puedeDeshacer: this.#calificadas > 0 };
-    if (id === undefined) return { hayTarjeta: false, ...base };
+    const base = { pendientes: this.sesion.pendientes, calificadas: this.#calificadas, puedeDeshacer: this.#calificadas > 0, areaId: this.filtro };
+    if (id === undefined) {
+      const aj = cargarAjustes(this.d.persistencia);
+      return { hayTarjeta: false, ...base, proxima: await proximaFechaDeRepaso(this.d.almacen, this.d.reloj, { limiteNuevas: aj.nuevasPorDia, areaId: this.filtro }) };
+    }
     const t = (await this.d.almacen.tarjetas.obtener(id))!;
     const respuestaVisible = this.#idRespuesta === id;
     const pistaVisible = this.#idPista === id;
     const areas = await this.d.almacen.areas.listar();
     const area = areas.find((a) => a.id === t.area_id);
+    const contexto = await contextoDeTarjeta(this.d.almacen, t);
     const v: VistaRepaso = {
       hayTarjeta: true, ...base,
+      numero: this.#calificadas + 1, total: this.#calificadas + base.pendientes, faltan: base.pendientes - 1,
+      etiqueta: etiquetaDeContexto(contexto), hayResumen: contexto.resumen !== null,
       area: area ? nombreDeArea(area, areas) : "",
       pregunta: t.pregunta,
       hayPista: !!t.pista,
@@ -245,6 +291,19 @@ export class PantallaRepaso {
       }));
     }
     return v;
+  }
+
+  /**
+   * Resumen del tema de la tarjeta actual (el apunte de aprendizaje). Es solo lectura: no toca la sesión,
+   * no revela la respuesta de la tarjeta ni cambia nada guardado. null si no hay tarjeta o el tema no tiene resumen.
+   */
+  async resumenDelTema(): Promise<{ tema: string; etiqueta: string; texto: string } | null> {
+    const id = await this.sesion.siguiente();
+    if (id === undefined) return null;
+    const t = await this.d.almacen.tarjetas.obtener(id);
+    if (!t) return null;
+    const c = await contextoDeTarjeta(this.d.almacen, t);
+    return c.resumen === null ? null : { tema: c.tema?.nombre ?? "", etiqueta: etiquetaDeContexto(c), texto: c.resumen };
   }
 
   /** Solo califica si ya se vio la respuesta. */
