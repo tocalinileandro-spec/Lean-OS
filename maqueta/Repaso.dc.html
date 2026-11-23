@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Lean OS: Repaso</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Inter,'Segoe UI',system-ui,sans-serif;background:#f7faff;color:#0b1b3a}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width:100%;min-height:900px;background:#f7faff;font-family:Inter,'Segoe UI',system-ui,sans-serif;color:#0b1b3a">
+  <header style="position:sticky;top:0;background:rgba(255,255,255,.88);border-bottom:1px solid #e1e8f5;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;padding:14px 40px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="width:14px;height:14px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 5px #eaf1ff"></span>
+      <span style="font-weight:800;font-size:19px;letter-spacing:-.02em">Lean OS</span>
+    </div>
+    <nav style="display:flex;gap:4px;flex-wrap:wrap">
+      <a href="Main.dc.html" style="padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#52617f">Áreas</a>
+      <a href="Repaso.dc.html" style="padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;background:#eaf1ff;color:#1d4ed8;display:flex;gap:8px;align-items:center">Repaso <span style="background:#2563eb;color:#fff;border-radius:999px;font-size:12px;padding:1px 8px">14</span></a>
+      <a href="Repaso.dc.html" style="padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#52617f">Hoy</a>
+      <a href="Repaso.dc.html" style="padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#52617f">Tareas</a>
+      <a href="Repaso.dc.html" style="padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#52617f">Apuntes</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#52617f;font-weight:500">
+      <span style="width:8px;height:8px;border-radius:50%;background:#16a34a"></span>Sincronizado
+    </div>
+  </header>
+
+  <main style="max-width:760px;margin:0 auto;padding:36px 24px 64px;display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px" role="group" aria-label="Qué repasar">
+        <sc-for list="{{areas}}" as="c" hint-placeholder-count="4">
+          <button type="button" style="min-height:44px;padding:0 18px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid {{c.borde}};background:{{c.bg}};color:{{c.ink}}">{{c.label}} <span style="opacity:.8;font-weight:700">{{c.n}}</span></button>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center" role="group" aria-label="Subáreas">
+        <span style="font-size:13px;font-weight:600;color:#52617f;margin-right:4px">Subárea</span>
+        <sc-for list="{{subs}}" as="s" hint-placeholder-count="3">
+          <button type="button" style="min-height:36px;padding:0 14px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid {{s.borde}};background:{{s.bg}};color:{{s.ink}}">{{s.label}}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:#52617f"><span>Tarjeta 3 de 9</span><span>Faltan 6</span></div>
+      <div style="height:8px;border-radius:999px;background:#e1e8f5"><div style="height:8px;width:33%;border-radius:999px;background:#2563eb"></div></div>
+    </div>
+
+    <article style="background:#fff;border:1px solid #e1e8f5;border-radius:24px;padding:40px 40px 32px;display:flex;flex-direction:column;gap:28px;box-shadow:0 1px 2px rgba(11,27,58,.04),0 16px 40px rgba(37,99,235,.08)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:700;color:#1d4ed8;background:#eaf1ff;padding:6px 14px;border-radius:999px">Programación › CS50 · Punteros</span>
+        <a href="Area.dc.html" style="font-size:13px;font-weight:600;color:#2563eb">Ver el resumen del tema</a>
+      </div>
+      <h1 style="margin:0;font-size:30px;line-height:1.3;font-weight:700;letter-spacing:-.02em">¿Qué guarda una variable de tipo puntero?</h1>
+      <div style="border-top:1px dashed #d3ddf0"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;background:#f1f6ff;border-radius:16px;padding:20px 24px">
+        <span style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#52617f">RESPUESTA</span>
+        <p style="margin:0;font-size:19px;line-height:1.5;color:#0b1b3a">La dirección de memoria de otro valor, no el valor en sí.</p>
+      </div>
+      <div>
+        <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#52617f">¿Qué tan bien te acordabas?</p>
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+          <sc-for list="{{notas}}" as="n" hint-placeholder-count="4">
+            <button type="button" style="min-height:64px;border-radius:16px;border:1.5px solid {{n.borde}};background:{{n.bg}};color:{{n.ink}};cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+              <span style="font-size:16px;font-weight:700">{{n.label}}</span>
+              <span style="font-size:12px;font-weight:600;opacity:.85">{{n.cuando}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </article>
+    <p style="margin:0;text-align:center;font-size:13px;color:#52617f">Atajos: espacio para mostrar la respuesta · 1 a 4 para calificar</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const on = { bg: '#2563eb', ink: '#ffffff', borde: '#2563eb' };
+    const off = { bg: '#ffffff', ink: '#334568', borde: '#d3ddf0' };
+    return {
+      areas: [
+        { label: 'Todo lo de hoy', n: '14', ...off },
+        { label: 'Programación', n: '9', ...on },
+        { label: 'Negocios', n: '5', ...off },
+        { label: 'Lógica', n: '0', ...off }
+      ],
+      subs: [
+        { label: 'Toda el área', ...off },
+        { label: 'CS50', ...on },
+        { label: 'IA aplicada', ...off }
+      ],
+      notas: [
+        { label: 'Otra vez', cuando: '< 1 min', bg: '#fdecec', ink: '#9b1c1c', borde: '#f3c3c3' },
+        { label: 'Difícil', cuando: '2 días', bg: '#fff3e0', ink: '#92400e', borde: '#f5d9ab' },
+        { label: 'Bien', cuando: '4 días', bg: '#eaf1ff', ink: '#1d4ed8', borde: '#bcd0f7' },
+        { label: 'Fácil', cuando: '9 días', bg: '#e8f7ee', ink: '#166534', borde: '#b7e2c6' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

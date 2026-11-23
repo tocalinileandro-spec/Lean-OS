@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Lean OS: Repaso en el celular</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Inter,'Segoe UI',system-ui,sans-serif;background:#f7faff;color:#0b1b3a}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:#f7faff;font-family:Inter,'Segoe UI',system-ui,sans-serif;color:#0b1b3a;display:flex;flex-direction:column;overflow:hidden">
+  <header style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:#fff;border-bottom:1px solid #e1e8f5">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="width:12px;height:12px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 4px #eaf1ff"></span>
+      <span style="font-weight:800;font-size:17px;letter-spacing:-.02em">Repaso</span>
+    </div>
+    <span style="font-size:13px;font-weight:700;color:#52617f">3 / 9</span>
+  </header>
+
+  <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px" role="group" aria-label="Qué repasar">
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="4">
+        <button type="button" style="flex:none;min-height:44px;padding:0 16px;border-radius:999px;font-size:14px;font-weight:600;border:1px solid {{c.borde}};background:{{c.bg}};color:{{c.ink}}">{{c.label}}</button>
+      </sc-for>
+    </div>
+    <div style="height:6px;border-radius:999px;background:#e1e8f5"><div style="height:6px;width:33%;border-radius:999px;background:#2563eb"></div></div>
+  </div>
+
+  <main style="flex:1;padding:16px 20px;display:flex;flex-direction:column;gap:16px;min-height:0">
+    <article style="flex:1;background:#fff;border:1px solid #e1e8f5;border-radius:24px;padding:24px 22px;display:flex;flex-direction:column;gap:18px;box-shadow:0 1px 2px rgba(11,27,58,.04),0 12px 32px rgba(37,99,235,.08)">
+      <span style="align-self:flex-start;font-size:12px;font-weight:700;color:#1d4ed8;background:#eaf1ff;padding:6px 12px;border-radius:999px">Programación › CS50 · Punteros</span>
+      <h1 style="margin:0;font-size:24px;line-height:1.3;font-weight:700;letter-spacing:-.02em">¿Qué guarda una variable de tipo puntero?</h1>
+      <div style="border-top:1px dashed #d3ddf0"></div>
+      <div style="background:#f1f6ff;border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#52617f">RESPUESTA</span>
+        <p style="margin:0;font-size:17px;line-height:1.5">La dirección de memoria de otro valor, no el valor en sí.</p>
+      </div>
+      <div style="margin-top:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+        <sc-for list="{{notas}}" as="n" hint-placeholder-count="4">
+          <button type="button" style="min-height:58px;border-radius:16px;border:1.5px solid {{n.borde}};background:{{n.bg}};color:{{n.ink}};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+            <span style="font-size:15px;font-weight:700">{{n.label}}</span>
+            <span style="font-size:12px;font-weight:600">{{n.cuando}}</span>
+          </button>
+        </sc-for>
+      </div>
+    </article>
+  </main>
+
+  <nav style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:#fff;border-top:1px solid #e1e8f5;padding:6px 6px 14px" aria-label="Principal">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+      <a href="Movil.dc.html" style="min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:600;color:{{t.ink}}">
+        <span style="width:44px;height:28px;border-radius:999px;background:{{t.bg}};display:flex;align-items:center;justify-content:center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{t.d}}"/></svg>
+        </span>
+        {{t.label}}
+      </a>
+    </sc-for>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const on = { bg: '#2563eb', ink: '#ffffff', borde: '#2563eb' };
+    const off = { bg: '#ffffff', ink: '#334568', borde: '#d3ddf0' };
+    const tOn = { bg: '#eaf1ff', ink: '#1d4ed8' };
+    const tOff = { bg: 'transparent', ink: '#52617f' };
+    return {
+      chips: [
+        { label: 'Todo · 14', ...off },
+        { label: 'Programación · 9', ...on },
+        { label: 'Negocios · 5', ...off },
+        { label: 'Lógica · 0', ...off }
+      ],
+      notas: [
+        { label: 'Otra vez', cuando: '< 1 min', bg: '#fdecec', ink: '#9b1c1c', borde: '#f3c3c3' },
+        { label: 'Difícil', cuando: '2 días', bg: '#fff3e0', ink: '#92400e', borde: '#f5d9ab' },
+        { label: 'Bien', cuando: '4 días', bg: '#eaf1ff', ink: '#1d4ed8', borde: '#bcd0f7' },
+        { label: 'Fácil', cuando: '9 días', bg: '#e8f7ee', ink: '#166534', borde: '#b7e2c6' }
+      ],
+      tabs: [
+        { label: 'Hoy', d: 'M3 11l9-8 9 8M5 10v10h14V10', ...tOff },
+        { label: 'Repaso', d: 'M4 5h16v14H4zM4 10h16', ...tOn },
+        { label: 'Áreas', d: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', ...tOff },
+        { label: 'Tareas', d: 'M5 12l4 4 10-10', ...tOff },
+        { label: 'Apuntes', d: 'M6 3h9l4 4v14H6zM9 12h7M9 16h7', ...tOff }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

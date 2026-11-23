@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Lean OS: Área Programación</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Inter,'Segoe UI',system-ui,sans-serif;background:#f7faff;color:#0b1b3a}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width:100%;min-height:900px;background:#f7faff;font-family:Inter,'Segoe UI',system-ui,sans-serif;color:#0b1b3a">
+  <header style="position:sticky;top:0;background:rgba(255,255,255,.88);border-bottom:1px solid #e1e8f5;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;padding:14px 40px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="width:14px;height:14px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 5px #eaf1ff"></span>
+      <span style="font-weight:800;font-size:19px;letter-spacing:-.02em">Lean OS</span>
+    </div>
+    <nav style="display:flex;gap:4px;flex-wrap:wrap">
+      <a href="Main.dc.html" style="padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;background:#eaf1ff;color:#1d4ed8">Áreas</a>
+      <a href="Repaso.dc.html" style="padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#52617f;display:flex;gap:8px;align-items:center">Repaso <span style="background:#2563eb;color:#fff;border-radius:999px;font-size:12px;padding:1px 8px">14</span></a>
+      <a href="Area.dc.html" style="padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#52617f">Hoy</a>
+      <a href="Area.dc.html" style="padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#52617f">Tareas</a>
+      <a href="Area.dc.html" style="padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#52617f">Apuntes</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#52617f;font-weight:500">
+      <span style="width:8px;height:8px;border-radius:50%;background:#16a34a"></span>Sincronizado
+    </div>
+  </header>
+
+  <main style="max-width:1120px;margin:0 auto;padding:36px 40px 64px;display:flex;flex-direction:column;gap:28px">
+    <a href="Main.dc.html" style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:#2563eb">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+      Todas las áreas
+    </a>
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:20px">
+      <div style="display:flex;align-items:center;gap:18px">
+        <div style="width:60px;height:60px;border-radius:18px;background:#eaf1ff;color:#1d4ed8;font-weight:800;font-size:26px;display:flex;align-items:center;justify-content:center">P</div>
+        <div>
+          <h1 style="margin:0;font-size:36px;font-weight:800;letter-spacing:-.03em;line-height:1.1">Programación</h1>
+          <p style="margin:6px 0 0;font-size:15px;color:#52617f">43 tarjetas · 2 subáreas · 9 para repasar hoy</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a href="Repaso.dc.html" style="display:flex;align-items:center;gap:8px;background:#2563eb;color:#fff;padding:13px 24px;border-radius:999px;font-weight:700;font-size:15px;box-shadow:0 8px 24px rgba(37,99,235,.28)">Repasar esta área · 9</a>
+        <button type="button" style="min-height:46px;padding:0 20px;border-radius:999px;border:1px solid #d3ddf0;background:#fff;color:#334568;font-weight:600;font-size:14px;cursor:pointer">Importar tarjetas</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start">
+      <sc-for list="{{subareas}}" as="s" hint-placeholder-count="2">
+        <section style="background:#fff;border:1px solid #e1e8f5;border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 1px 2px rgba(11,27,58,.04),0 8px 24px rgba(37,99,235,.06)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+            <div>
+              <h2 style="margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em">{{s.nombre}}</h2>
+              <p style="margin:4px 0 0;font-size:13px;color:#52617f">{{s.resumen}}</p>
+            </div>
+            <a href="Repaso.dc.html" style="font-size:13px;font-weight:700;color:#1d4ed8;background:#eaf1ff;padding:8px 14px;border-radius:999px;white-space:nowrap">Repasar · {{s.hoy}}</a>
+          </div>
+          <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column">
+            <sc-for list="{{s.temas}}" as="t" hint-placeholder-count="4">
+              <li style="display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid #eef2fa">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:15px;font-weight:600">{{t.nombre}}</div>
+                  <div style="font-size:13px;color:#52617f;margin-top:2px">{{t.cartas}} tarjetas</div>
+                </div>
+                <span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:{{t.bg}};color:{{t.ink}}">{{t.estado}}</span>
+                <button type="button" aria-label="Más opciones de {{t.nombre}}" style="width:44px;height:44px;border-radius:50%;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="#52617f" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+                </button>
+              </li>
+            </sc-for>
+          </ul>
+        </section>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:stretch">
+      <form style="flex:1 1 420px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:#fff;border:1.5px dashed #c5d3ee;border-radius:20px;padding:18px 22px">
+        <label for="nueva-sub" style="font-weight:600;font-size:15px">Nueva subárea</label>
+        <input id="nueva-sub" type="text" placeholder="Ej: Python, Bases de datos…" style="flex:1;min-width:180px;height:46px;box-sizing:border-box;border:1px solid #e1e8f5;border-radius:999px;padding:0 20px;font-family:inherit;font-size:15px;background:#f7faff;color:#0b1b3a">
+        <button type="button" style="height:46px;padding:0 22px;border-radius:999px;border:0;background:#0b1b3a;color:#fff;font-weight:600;font-size:15px">Crear</button>
+      </form>
+      <div style="flex:1 1 320px;display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #e1e8f5;border-radius:20px;padding:18px 22px">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#52617f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+        <p style="margin:0;font-size:14px;color:#52617f;line-height:1.5"><strong style="color:#0b1b3a">Papelera:</strong> lo que borres queda 30 días y podés restaurarlo.</p>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const hoy = { bg: '#2563eb', ink: '#ffffff' };
+    const ok = { bg: '#e8f7ee', ink: '#166534' };
+    const nuevo = { bg: '#eaf1ff', ink: '#1d4ed8' };
+    return {
+      subareas: [
+        { nombre: 'CS50', resumen: '30 tarjetas · 4 temas', hoy: 6, temas: [
+          { nombre: 'Punteros', cartas: 9, estado: '3 hoy', ...hoy },
+          { nombre: 'Memoria', cartas: 8, estado: '2 hoy', ...hoy },
+          { nombre: 'Arreglos', cartas: 7, estado: 'Al día', ...ok },
+          { nombre: 'Estructuras de datos', cartas: 6, estado: '1 hoy', ...hoy }
+        ] },
+        { nombre: 'IA aplicada', resumen: '13 tarjetas · 3 temas', hoy: 3, temas: [
+          { nombre: 'Agentes', cartas: 6, estado: '2 hoy', ...hoy },
+          { nombre: 'Prompts', cartas: 4, estado: 'Al día', ...ok },
+          { nombre: 'Claude Code', cartas: 3, estado: 'Nuevo', ...nuevo }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
