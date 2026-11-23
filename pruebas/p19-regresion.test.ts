@@ -1,7 +1,7 @@
 /**
  * P19 (sin regresión): lo que ya existía antes de la etapa 7 sigue funcionando.
  * (a) datos con el formato anterior se ven bien en las pantallas nuevas (memoria e IndexedDB);
- * (b) el esquema no cambió (prueba "golden");
+ * (b) el esquema no cambió (prueba "golden" que lee los campos reales de esquema.ts);
  * (c) tras usar las funciones nuevas, los datos exportan, reimportan y sincronizan sin errores ni duplicados.
  */
 import "fake-indexeddb/auto";
@@ -141,6 +141,54 @@ async function verPantallasNuevas(almacen: Almacen) {
   expect(hoy.texto()).toContain("Estudiar funciones");
 }
 
+// ---------------------------------------------------------------- esquema "golden"
+
+const REGISTRO = ["created_at", "deleted_at", "id", "rev", "updated_at"];
+/** Campos esperados por interfaz: [obligatorios, opcionales] (sin los de Registro, que se comprueban aparte). */
+const ESPERADO: Record<string, [string[], string[]]> = {
+  Area: [["nombre", "nombre_normalizado", "padre_id"], []],
+  Tarjeta: [["area_id", "contenido_updated_at", "ease", "importacion_id", "intervalo", "lapses", "pista", "pregunta", "repaso_updated_at", "reps", "respuesta", "suspendida", "vence"], []],
+  Repaso: [["calificacion", "ease_antes", "ease_despues", "intervalo_antes", "intervalo_despues", "repasado_en", "tarjeta_id"], ["anula_a"]],
+  Meta: [["anio", "estado", "padre_id", "tipo", "titulo", "trimestre"], []],
+  Tarea: [["estado", "fecha", "hecha_en", "meta_id", "nota", "titulo"], ["repeticion", "serie_id"]],
+  Apunte: [["area_id", "etiquetas", "importacion_id", "tema", "texto", "tipo", "titulo"], []],
+  Importacion: [["area_id", "apunte_id", "duplicadas_omitidas", "fecha_bloque", "tarjetas_creadas", "tema"], []],
+};
+const TABLAS_ESPERADAS = ["tarjetas", "repasos", "areas", "metas", "tareas", "apuntes", "importaciones"];
+
+function camposDe(texto: string, interfaz: string): { obl: string[]; opc: string[] } | null {
+  const m = new RegExp(`export interface ${interfaz}\\b[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(texto);
+  if (!m) return null;
+  const obl: string[] = [];
+  const opc: string[] = [];
+  for (const l of m[1]!.split("\n")) {
+    const c = /^ {2}(\w+)(\?)?:/.exec(l);
+    if (c) (c[2] ? opc : obl).push(c[1]!);
+  }
+  return { obl: obl.sort(), opc: opc.sort() };
+}
+
+/** Compara el texto de esquema.ts con lo esperado; devuelve los problemas en castellano. */
+function compararEsquema(texto: string): string[] {
+  const problemas: string[] = [];
+  const reg = camposDe(texto, "Registro");
+  if (!reg || JSON.stringify(reg) !== JSON.stringify({ obl: REGISTRO, opc: [] })) problemas.push("Registro: cambiaron los campos comunes (id, created_at, updated_at, deleted_at, rev).");
+  for (const [nombre, [oblEsp, opcEsp]] of Object.entries(ESPERADO)) {
+    const c = camposDe(texto, nombre);
+    if (!c) { problemas.push(`${nombre}: no se encontró la interfaz.`); continue; }
+    const esperados = new Set([...oblEsp, ...opcEsp]);
+    const reales = new Set([...c.obl, ...c.opc]);
+    for (const f of reales) if (!esperados.has(f)) problemas.push(`${nombre}: campo nuevo “${f}” (${c.opc.includes(f) ? "opcional" : "obligatorio"}).`);
+    for (const f of esperados) if (!reales.has(f)) problemas.push(`${nombre}: falta el campo “${f}”.`);
+    for (const f of opcEsp) if (c.obl.includes(f)) problemas.push(`${nombre}: “${f}” pasó de opcional a obligatorio.`);
+    for (const f of oblEsp) if (c.opc.includes(f)) problemas.push(`${nombre}: “${f}” pasó de obligatorio a opcional.`);
+  }
+  const t = /export const TABLAS = \[([^\]]*)\] as const/.exec(texto);
+  const tablas = t ? [...t[1]!.matchAll(/"(\w+)"/g)].map((x) => x[1]!) : [];
+  if (JSON.stringify(tablas) !== JSON.stringify(TABLAS_ESPERADAS)) problemas.push(`TABLAS cambió: ahora es [${tablas.join(", ")}].`);
+  return problemas;
+}
+
 describe("P19: sin regresión", () => {
   it("P19: datos de antes de la etapa 7 se ven bien en las pantallas nuevas (memoria)", async () => {
     const a = new AlmacenMemoria();
@@ -156,49 +204,22 @@ describe("P19: sin regresión", () => {
     expect(await conteos(idb)).toEqual({ tarjetas: 4, repasos: 1, areas: 3, metas: 2, tareas: 2, apuntes: 2, importaciones: 2 });
   });
 
-  it("P19: el esquema no cambió (campos de cada registro y lista de tablas)", () => {
-    // `Record<keyof X, true>` obliga a listar TODOS los campos de la interfaz: agregar o quitar uno rompe `npm run tipos`.
-    const comunes = { id: true, created_at: true, updated_at: true, deleted_at: true, rev: true } as const;
-    const area = { ...comunes, nombre: true, nombre_normalizado: true, padre_id: true } satisfies Record<keyof Area, true>;
-    const tarjeta = {
-      ...comunes, area_id: true, pregunta: true, respuesta: true, pista: true, suspendida: true, importacion_id: true,
-      ease: true, intervalo: true, reps: true, lapses: true, vence: true, contenido_updated_at: true, repaso_updated_at: true,
-    } satisfies Record<keyof Tarjeta, true>;
-    const repaso = {
-      ...comunes, tarjeta_id: true, calificacion: true, repasado_en: true, ease_antes: true, ease_despues: true,
-      intervalo_antes: true, intervalo_despues: true, anula_a: true,
-    } satisfies Record<keyof Repaso, true>;
-    const meta = { ...comunes, tipo: true, anio: true, trimestre: true, titulo: true, estado: true, padre_id: true } satisfies Record<keyof Meta, true>;
-    const tarea = {
-      ...comunes, titulo: true, fecha: true, meta_id: true, nota: true, estado: true, hecha_en: true, repeticion: true, serie_id: true,
-    } satisfies Record<keyof Tarea, true>;
-    const apunte = { ...comunes, titulo: true, texto: true, tipo: true, etiquetas: true, area_id: true, tema: true, importacion_id: true } satisfies Record<keyof Apunte, true>;
-    const importacion = {
-      ...comunes, tema: true, fecha_bloque: true, area_id: true, tarjetas_creadas: true, duplicadas_omitidas: true, apunte_id: true,
-    } satisfies Record<keyof Importacion, true>;
-    const claves = (o: object) => Object.keys(o).sort();
-    const registro = ["created_at", "deleted_at", "id", "rev", "updated_at"];
+  it("P19: el esquema no cambió (campos reales de esquema.ts y lista de tablas)", () => {
+    const problemas = compararEsquema(readFileSync(new URL("../src/compartido/esquema.ts", import.meta.url), "utf8"));
+    expect(problemas, `El esquema cambió:\n- ${problemas.join("\n- ")}`).toEqual([]);
+  });
 
-    expect(claves(area)).toEqual([...registro, "nombre", "nombre_normalizado", "padre_id"].sort());
-    expect(claves(tarjeta)).toEqual([...registro, "area_id", "contenido_updated_at", "ease", "importacion_id", "intervalo", "lapses", "pista", "pregunta", "repaso_updated_at", "reps", "respuesta", "suspendida", "vence"].sort());
-    expect(claves(repaso)).toEqual([...registro, "anula_a", "calificacion", "ease_antes", "ease_despues", "intervalo_antes", "intervalo_despues", "repasado_en", "tarjeta_id"].sort());
-    expect(claves(meta)).toEqual([...registro, "anio", "estado", "padre_id", "tipo", "titulo", "trimestre"].sort());
-    expect(claves(tarea)).toEqual([...registro, "estado", "fecha", "hecha_en", "meta_id", "nota", "repeticion", "serie_id", "titulo"].sort());
-    expect(claves(apunte)).toEqual([...registro, "area_id", "etiquetas", "importacion_id", "tema", "texto", "tipo", "titulo"].sort());
-    expect(claves(importacion)).toEqual([...registro, "area_id", "apunte_id", "duplicadas_omitidas", "fecha_bloque", "tarjetas_creadas", "tema"].sort());
-
-    // Los obligatorios son los de los datos de antes (sin los opcionales de Repaso y Tarea): si se exige uno nuevo, `sembrar` deja de compilar.
-    const d = datosDeAntes();
-    expect(Object.keys(d.repasos[0]!)).not.toContain("anula_a");
-    expect(Object.keys(d.tareas[0]!)).not.toContain("repeticion");
-    expect(Object.keys(d.tareas[0]!)).not.toContain("serie_id");
-    expect(claves(d.areas[0]!)).toEqual(claves(area));
-    expect(claves(d.tarjetas[0]!)).toEqual(claves(tarjeta));
-    expect(claves(d.metas[0]!)).toEqual(claves(meta));
-    expect(claves(d.apuntes[0]!)).toEqual(claves(apunte));
-    expect(claves(d.importaciones[0]!)).toEqual(claves(importacion));
-
-    expect([...TABLAS]).toEqual(["tarjetas", "repasos", "areas", "metas", "tareas", "apuntes", "importaciones"]);
+  it("P19: el detector del esquema falla si se agrega un campo, se quita uno o un opcional pasa a obligatorio", () => {
+    const real = readFileSync(new URL("../src/compartido/esquema.ts", import.meta.url), "utf8");
+    const agregado = real.replace("  pista: string | null;", "  pista: string | null;\n  nuevoObl: number;");
+    expect(compararEsquema(agregado).join("\n")).toContain("Tarjeta: campo nuevo “nuevoObl”");
+    const quitado = real.replace("  pista: string | null;\n", "");
+    expect(compararEsquema(quitado).join("\n")).toContain("Tarjeta: falta el campo “pista”");
+    const obligatorio = real.replace("  anula_a?: Id | null;", "  anula_a: Id | null;");
+    expect(compararEsquema(obligatorio).join("\n")).toContain("Repaso: “anula_a” pasó de opcional a obligatorio");
+    const tablas = real.replace('"importaciones"] as const', '"importaciones", "otra"] as const');
+    expect(compararEsquema(tablas).join("\n")).toContain("TABLAS");
+    expect(compararEsquema(real)).toEqual([]);
   });
 
   it("P19: tras usar lo nuevo, los datos exportan, reimportan y sincronizan sin errores ni duplicados", async () => {
