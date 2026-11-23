@@ -191,3 +191,47 @@ export class SesionRepaso {
     return true;
   }
 }
+
+/**
+ * Sesión de repaso libre (práctica): cola en memoria que NO escribe nada en el almacén.
+ * "Otra vez" reencola al final; las otras tres calificaciones pasan la tarjeta. Deshacer es solo en memoria.
+ */
+export class SesionLibre {
+  #cola: Id[];
+  #historial: Id[][] = [];
+
+  private almacen: Almacen;
+
+  constructor(almacen: Almacen, cola: Tarjeta[]) {
+    this.almacen = almacen;
+    this.#cola = cola.map((t) => t.id);
+  }
+
+  get pendientes(): number { return this.#cola.length; }
+  get actualId(): Id | undefined { return this.#cola[0]; }
+
+  /** Descarta del frente las tarjetas borradas o suspendidas durante la sesión (solo lee) y devuelve la actual. */
+  async siguiente(): Promise<Id | undefined> {
+    while (this.#cola.length > 0) {
+      const t = await this.almacen.tarjetas.obtener(this.#cola[0]!);
+      if (t && t.deleted_at === null && !t.suspendida) return t.id;
+      this.#cola.shift();
+    }
+    return undefined;
+  }
+
+  async calificar(boton: Calificacion): Promise<void> {
+    const id = await this.siguiente();
+    if (id === undefined) throw new Error("La cola está vacía");
+    this.#historial.push([...this.#cola]);
+    this.#cola.shift();
+    if (boton === "otra_vez") this.#cola.push(id);
+  }
+
+  async deshacer(): Promise<boolean> {
+    const antes = this.#historial.pop();
+    if (!antes) return false;
+    this.#cola = antes;
+    return true;
+  }
+}

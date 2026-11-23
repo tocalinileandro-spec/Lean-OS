@@ -1,12 +1,14 @@
 # Estado
 
-**COMPLETO** (2026-11-23). Etapa 7 terminada: paridad funcional con el Lean OS original (`prototipo/`) y diseño profesional según `docs/maqueta/`, todo en `main` con CI verde. Para dejarlo en producción solo falta lo de siempre: cargar los secretos y desplegar (ver "Qué tenés que hacer vos" más abajo).
+**COMPLETO** (2026-11-23). Después de la etapa 7 se agregó el **repaso libre** (P20-P22, pedido del dueño): "Repasar todo" en Repaso, práctica sobre todas las tarjetas del filtro sin cambiar el calendario. PR #24.
+
+Etapa 7 (2026-11-23). Etapa 7 terminada: paridad funcional con el Lean OS original (`prototipo/`) y diseño profesional según `docs/maqueta/`, todo en `main` con CI verde. Para dejarlo en producción solo falta lo de siempre: cargar los secretos y desplegar (ver "Qué tenés que hacer vos" más abajo).
 
 ## Control de sesión (presupuesto de 20 h)
 
 - **Sesión activa:** ninguna. Cerrada el 2026-11-23 04:40 UTC.
 - **Esta sesión:** inicio 2026-11-23 02:24:04 UTC, cierre 04:40 UTC, unas 2,3 h.
-- **Total acumulado:** 4,2 h de 20 h (1,9 h de antes + 2,3 h).
+- **Total acumulado:** unas 4,6 h de 20 h (1,9 h de antes + 2,3 h de la etapa 7 + 0,4 h del repaso libre).
 - Si otra sesión lee esto: dice COMPLETO, no hay nada que hacer.
 
 ## Etapa 7: qué quedó hecho
