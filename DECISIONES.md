@@ -330,3 +330,7 @@ Formato: fecha, qué se eligió, por qué.
 ## 2026-11-23 (B3: la prueba estática ya no exige `scheduled_snapshots`)
 
 El dueño quitó `scheduled_snapshots = true` de `fly.toml` (commit 699ae7a) porque Fly rechazó la clave al desplegar; era la clave "escrita de memoria" que ESTADO.md marcaba como dudosa. La prueba B3 seguía exigiéndola y `main` quedó en rojo. Se quita solo esa aserción (el resto de B3 queda igual: HTTPS, puerto, `/health`, volumen en `/data`, Dockerfile y workflow) y se agrega una que confirma que la clave rechazada no vuelve. No es un cambio del criterio B3 de la sección 4: sigue siendo "desplegar y consultar /health".
+
+## 2026-11-23 (p-docs, ciclo 2: P15 y P18 medibles)
+
+El revisor señaló dos incoherencias de los criterios nuevos. P18 pedía 36 archivos pero son 3 pantallas × 3 anchos × 2 temas = 18: se corrige a 18 o más. P15 pedía Playwright dentro de `verificar`, que no lo corre: ahora se mide en dos capas. `verificar` comprueba CSS y DOM (media query, tamaños mínimos, barras) y lee `docs/capturas/medicion.json`; `npm run capturas` hace la medición real con Playwright y escribe ese archivo, fallando si hay un control menor a 44 px.
