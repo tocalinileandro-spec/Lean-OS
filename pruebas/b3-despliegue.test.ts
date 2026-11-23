@@ -17,7 +17,7 @@ describe("B3: despliegue en Fly.io (verificación estática)", () => {
     expect(t).toMatch(/internal_port = 8080/);
     expect(t).toMatch(/\[\[http_service\.checks\]\][\s\S]*path = "\/health"/);
     expect(t).toMatch(/\[\[mounts\]\][\s\S]*source = "lean_os_data"[\s\S]*destination = "\/data"/);
-    expect(t).toMatch(/scheduled_snapshots = true/);
+    expect(t).not.toMatch(/scheduled_snapshots/);
     expect(t).toMatch(/snapshot_retention = \d+/);
     expect(t).toMatch(/DATA_DIR = "\/data"/);
     expect(t).toMatch(/min_machines_running = 1/);
