@@ -30,10 +30,11 @@ export async function crearArea(almacen: Almacen, reloj: Reloj, nombre: string, 
   const limpio = nombre.trim().replace(/\s+/g, " ");
   const esSub = padreId !== null;
   const que = esSub ? "subárea" : "área";
+  const del = esSub ? "de la subárea" : "del área";
   const norm = normalizar(limpio);
-  if (norm === "") throw new Error(`El nombre de la ${que} no puede quedar vacío.`);
-  if (limpio.includes(">")) throw new Error(`El nombre de la ${que} no puede llevar “>”: las subáreas se crean desde su área.`);
-  if ([...limpio].length > LARGO_MAXIMO_AREA) throw new Error(`El nombre de la ${que} es demasiado largo: máximo ${LARGO_MAXIMO_AREA} letras.`);
+  if (norm === "") throw new Error(`El nombre ${del} no puede quedar vacío.`);
+  if (limpio.includes(">")) throw new Error(`El nombre ${del} no puede llevar “>”: las subáreas se crean desde su área.`);
+  if ([...limpio].length > LARGO_MAXIMO_AREA) throw new Error(`El nombre ${del} es demasiado largo: máximo ${LARGO_MAXIMO_AREA} letras.`);
   if (padreId !== null) {
     const padre = await almacen.areas.obtener(padreId);
     if (!padre || !vivo(padre)) throw new Error("El área elegida no existe (o está en la papelera).");
@@ -384,6 +385,8 @@ export type ObjetivoDeBorrado = { tipo: "tema" | "area"; id: Id };
 export async function resumenDeBorrado(almacen: Almacen, objetivo: ObjetivoDeBorrado): Promise<ResumenDeBorrado> {
   const cabeza: Cabeza = objetivo.tipo === "tema" ? { tipo: "tema", imp: await importacionViva(almacen, objetivo.id) } : { tipo: "area", area: await areaViva(almacen, objetivo.id) };
   const r = resumirConjunto(await reunir(almacen, cabeza, vivo2, true));
+  // Una subárea no se cuenta a sí misma: solo importan sus temas y tarjetas.
+  if (cabeza.tipo === "area" && cabeza.area.padre_id !== null) r.subareas = 0;
   return { ...r, texto: textoResumen(r) };
 }
 /**
@@ -515,7 +518,9 @@ export async function conjuntosEnPapelera(almacen: Almacen): Promise<ConjuntoPap
     if (padre && padre.deleted_at === a.deleted_at) continue; // viaja con su área
     const d = a.deleted_at;
     const c = await reunir(almacen, { tipo: "area", area: a }, (x) => x === d, false);
-    salida.push(armar("area", a.id, padre ? `${padre.nombre} › ${a.nombre}` : a.nombre, d, c));
+    const item = armar("area", a.id, padre ? `${padre.nombre} › ${a.nombre}` : a.nombre, d, c);
+    if (a.padre_id !== null) item.subareas = 0; // una subárea no se cuenta a sí misma
+    salida.push(item);
   }
   for (const imp of importaciones) {
     if (imp.deleted_at === null) continue;

@@ -2,6 +2,7 @@
  * Interfaz de Áreas (inicio) y del detalle de área: P2, parte de interfaz de P3, P6 y P7.
  * La lógica está probada en areas.test.ts; acá se prueba lo que se ve y se toca (DOM simulado, happy-dom).
  */
+import { readFileSync } from "node:fs";
 import { Window } from "happy-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import { AlmacenMemoria } from "../src/compartido/almacen.ts";
@@ -436,7 +437,7 @@ describe("P7 (UI): borrar con confirmación, deshacer y papelera", () => {
     await ui.clic("Borrar subárea");
     const texto = ui.doc.querySelector(".confirmacion")!.textContent!;
     expect(texto).toContain("¿Borrar la subárea “CS50”?");
-    expect(texto).toContain("2 temas, 5 tarjetas");
+    expect(texto).toContain("Se van a la papelera: 2 temas, 5 tarjetas.");
     await ui.clic("Mover a la papelera");
     expect(ui.texto()).toContain("Subárea “CS50” quedó en la papelera 30 días.");
     expect([...ui.doc.querySelectorAll(".seccion-area h2")].map((x) => x.textContent)).toEqual(["Python"]);
@@ -467,7 +468,7 @@ describe("P7 (UI): borrar con confirmación, deshacer y papelera", () => {
     await ui.clic("Ver todas las tarjetas");
     await ui.clic("Ver papelera");
     expect(ui.texto()).toContain("Área: Programación (1 subárea, 1 tema, 2 tarjetas)");
-    expect(ui.texto()).toContain("Área: Programación › CS50 (1 subárea, 2 temas, 5 tarjetas)");
+    expect(ui.texto()).toContain("Área: Programación › CS50 (2 temas, 5 tarjetas)");
     const filas = [...ui.doc.querySelectorAll(".lista li")].filter((li) => li.textContent!.includes("Área:"));
     const filaCs = filas.find((li) => li.textContent!.includes("CS50"))!;
     (filaCs.querySelector("button") as unknown as HTMLButtonElement).click();
@@ -480,5 +481,45 @@ describe("P7 (UI): borrar con confirmación, deshacer y papelera", () => {
     await ui.app.esperar();
     expect(ui.texto()).toContain("Área restaurada");
     expect((await a.areas.listar()).map((x) => x.nombre).sort()).toEqual(["Idiomas", "Programación", "Python"]);
+  });
+});
+
+describe("P2/P6 (CSS): nombres largos y objetivos táctiles", () => {
+  const css = readFileSync(new URL("../src/cliente/estilos.css", import.meta.url), "utf8");
+  const regla = (sel: string) => css.replace(/\/\*[\s\S]*?\*\//g, "").split("}").map((b) => b.split("{")).filter((p) => p.length === 2 && p[0]!.split(",").map((x) => x.trim()).includes(sel)).map((p) => p[1]!).join(";");
+
+  it("P2 (CSS): los nombres largos sin espacios se cortan y los items de grilla y flex pueden encogerse", () => {
+    for (const sel of [".area-nombre", ".area-abrir", ".etiquetas-sub li", ".encabezado-pantalla h1", ".fila-tema-nombre", ".confirmacion p", ".aviso"]) {
+      expect(regla(sel), sel).toMatch(/overflow-wrap:\s*anywhere/);
+    }
+    for (const sel of [".area-tarjeta", ".seccion-area", ".fila-tema-linea > *", ".confirmacion"]) expect(regla(sel), sel).toMatch(/min-width:\s*0/);
+    expect(regla(".mover-tema select")).toMatch(/max-width:\s*100%/);
+  });
+
+  it("P2 (CSS): el botón que abre el área mide 44 px o más", () => {
+    expect(regla(".area-abrir")).toMatch(/min-height:\s*var\(--toque\)/);
+    expect(regla(".area-abrir")).toMatch(/min-width:\s*var\(--toque\)/);
+  });
+
+  it("P7 (UI): borrar una subárea dice solo temas y tarjetas; un área con subáreas dice 2 subáreas, 3 temas, 4 tarjetas", async () => {
+    const a = new AlmacenMemoria();
+    const r = new RelojSimulado(AHORA);
+    await importar(a, r, BLOQUE("Programación > CS50", "Funciones", 2));
+    await importar(a, r, BLOQUE("Programación > Python", "Listas", 1));
+    await importar(a, r, BLOQUE("Programación > Python", "Dicts", 1));
+    const ui = await abrir(a, r);
+    await ui.clic("Programación");
+    await ui.clic("Borrar subárea");
+    expect(ui.doc.querySelector(".confirmacion")!.textContent).toContain("Se van a la papelera: 1 tema, 2 tarjetas.");
+    expect(ui.doc.querySelector(".confirmacion")!.textContent).not.toContain("subárea,");
+    await ui.clic("Cancelar");
+    await ui.clic("Borrar área");
+    expect(ui.doc.querySelector(".confirmacion")!.textContent).toContain("Se van a la papelera: 2 subáreas, 3 temas, 4 tarjetas.");
+  });
+
+  it("P3 (UI): el mensaje de nombre vacío dice 'del área' y 'de la subárea'", async () => {
+    const ui = await abrir();
+    await ui.clic("Crear área");
+    expect(ui.texto()).toContain("El nombre del área no puede quedar vacío.");
   });
 });

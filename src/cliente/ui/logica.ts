@@ -60,7 +60,7 @@ export function mensajeDeError(error: unknown): string {
 }
 
 /** Mensajes en castellano de `areas.ts` (crear, mover, borrar y restaurar): ya dicen qué pasó y qué hacer, se muestran tal cual. */
-const MENSAJES_DE_AREAS = /^(El nombre de la (área|subárea)|El área (elegida )?no existe|El área no está|El tema no (existe|está)|El tema ya está|El destino no existe|Una subárea no puede|Esa es (una subárea|un área)|Ya no está en la papelera|Para restaurar (el tema|la subárea))/;
+const MENSAJES_DE_AREAS = /^(El nombre (del área|de la subárea)|El área (elegida )?no existe|El área no está|El tema no (existe|está)|El tema ya está|El destino no existe|Una subárea no puede|Esa es (una subárea|un área)|Ya no está en la papelera|Para restaurar (el tema|la subárea))/;
 
 const DIAS_LARGOS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];

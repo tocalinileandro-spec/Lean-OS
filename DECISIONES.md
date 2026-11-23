@@ -395,3 +395,10 @@ Código en `src/compartido/areas.ts` (sin DOM, sin cambios de esquema); papelera
 - **Íconos nuevos** (mismo estilo, `aria-hidden`): volver, siguiente, mas, tres-puntos (trazo grueso de largo cero con puntas redondas) y papelera.
 - **Pruebas:** `pruebas/ui-areas.test.ts` (P2 x5, P3 (UI) x3, P6 (UI) x5, P7 (UI) x3). `fase-actual.ts`: se agrega "P2" a `IDS_EXIGIBLES` (P3, P6 y P7 ya lo eran).
 - **Capturas (Playwright temporal, no commiteado):** Áreas y detalle a 390 y 1440 px, claro y oscuro, con datos importados por la interfaz: grilla en 3 columnas a 1440 y en 1 a 390, sin scroll horizontal, todos los controles de 44 px o más a 390, contenido no tapado por la barra inferior.
+
+## 2026-11-23 (p-areas-ui, ciclo 2)
+
+- **Nombres largos sin espacios:** `overflow-wrap: anywhere` y `min-width: 0` en tarjetas, secciones, filas de tema, etiquetas de subárea, títulos, confirmaciones, avisos y el formulario de mover; `max-width: 100%` en select, campos y botones. Medido con Playwright temporal (área de 60 X, subárea de 60 Y, tema de 80 Z, subárea de 70 Q) a 390, 768 y 1440 px, claro y oscuro, en Áreas, detalle, menú, mover, resumen, confirmaciones, aviso con Deshacer y papelera de Tarjetas: sin scroll horizontal ni controles menores a 44 px. Prueba de reglas CSS en `ui-areas.test.ts`.
+- **`.area-abrir`:** `min-height` y `min-width` de 44 px; el `::after` sigue cubriendo la tarjeta.
+- **Borrado de una subárea:** el texto ya no se cuenta a sí misma ("Se van a la papelera: 2 temas, 5 tarjetas."), en `resumenDeBorrado` y en el detalle de la papelera. Para un área con subáreas sigue "2 subáreas, 3 temas, 4 tarjetas". Corrección legítima del texto: la aserción de `ui-areas.test.ts` que decía "(1 subárea, 2 temas, 5 tarjetas)" pasó a "(2 temas, 5 tarjetas)"; el resto de lo que verifica no cambió.
+- **Gramática:** "El nombre del área no puede quedar vacío." (y "es demasiado largo", "no puede llevar “>”"); para subárea sigue "de la subárea". `MENSAJES_DE_AREAS` actualizado. Ninguna prueba previa fijaba el texto viejo.
